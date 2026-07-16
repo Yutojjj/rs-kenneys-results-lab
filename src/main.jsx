@@ -1,10 +1,14 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { createRoot } from "react-dom/client";
 import {
   Camera,
+  CalendarDays,
   ImagePlus,
   Search,
   Settings,
+  Trophy,
+  UsersRound,
   WifiOff
 } from "lucide-react";
 import "./styles.css";
@@ -973,20 +977,14 @@ function MeetsView({ records, allRecords, upcomingMeets, archivedMembers, member
     setVisualMode(nextMode);
     setModeSwipeOffset(targetOffset, true);
     modeSwipeTimerRef.current = window.setTimeout(() => {
-      setMode(nextMode);
-      window.requestAnimationFrame(() => {
-        const track = modeSwipeTrackRef.current;
-        if (track) {
-          track.classList.remove("swipeAnimating");
-          track.style.setProperty("--swipe-offset", "0px");
-        }
-        const tabBar = modeTabsRef.current;
-        if (tabBar) {
-          tabBar.classList.remove("swipeAnimating");
-          tabBar.style.setProperty("--meet-mode-drag-offset", "0%");
-        }
-        modeSwipeSurfaceRef.current?.classList.remove("swipeDragging");
-      });
+      const track = modeSwipeTrackRef.current;
+      const tabBar = modeTabsRef.current;
+      track?.classList.remove("swipeAnimating");
+      tabBar?.classList.remove("swipeAnimating");
+      flushSync(() => setMode(nextMode));
+      track?.style.setProperty("--swipe-offset", "0px");
+      tabBar?.style.setProperty("--meet-mode-drag-offset", "0%");
+      modeSwipeSurfaceRef.current?.classList.remove("swipeDragging");
     }, 220);
   }
 
@@ -1136,9 +1134,18 @@ function MeetsView({ records, allRecords, upcomingMeets, archivedMembers, member
         style={{ "--meet-mode-offset": `${modeIndex * 100}%`, "--meet-mode-drag-offset": "0%" }}
         aria-label="大会の開催状況"
       >
-        <button className={visualMode === "upcoming" ? "active" : ""} onClick={() => changeMode("upcoming")}>開催予定</button>
-        <button className={visualMode === "history" ? "active" : ""} onClick={() => changeMode("history")}>大会結果</button>
-        <button className={visualMode === "members" ? "active" : ""} onClick={() => changeMode("members")}>選手管理</button>
+        <button className={visualMode === "upcoming" ? "active" : ""} onClick={() => changeMode("upcoming")}>
+          <CalendarDays size={17} strokeWidth={2.2} />
+          <span>予定</span>
+        </button>
+        <button className={visualMode === "history" ? "active" : ""} onClick={() => changeMode("history")}>
+          <Trophy size={17} strokeWidth={2.2} />
+          <span>結果</span>
+        </button>
+        <button className={visualMode === "members" ? "active" : ""} onClick={() => changeMode("members")}>
+          <UsersRound size={17} strokeWidth={2.2} />
+          <span>選手</span>
+        </button>
       </section>
       <div
         className="swipeSurface meetModeSwipeSurface"
