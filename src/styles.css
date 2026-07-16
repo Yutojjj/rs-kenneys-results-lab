@@ -35,7 +35,7 @@ button {
   width: min(1120px, calc(100% - 24px));
   min-height: 100dvh;
   --dock-width: min(1120px, calc(100% - 16px));
-  --tab-height: 64px;
+  --tab-height: 58px;
   --control-dock-height: 52px;
   margin: 0 auto;
   padding: 8px 0 calc(178px + env(safe-area-inset-bottom));
@@ -1072,6 +1072,16 @@ h1 {
 .meetsView {
   overflow-x: clip;
   touch-action: pan-y;
+}
+
+.meetModeSwipeSurface {
+  min-height: calc(100dvh - 190px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+}
+
+.meetModeSwipeTrack,
+.meetModeSwipeTrack > .swipePane.activePane,
+.meetModeSwipeSurface.swipeDragging .meetModeSwipeTrack > .swipePane {
+  min-height: inherit;
 }
 
 .meetModeContent {
