@@ -6,7 +6,6 @@ import {
   ImagePlus,
   Search,
   Settings,
-  Timer,
   UsersRound,
   WifiOff
 } from "lucide-react";
@@ -17,8 +16,7 @@ import { bestQualification, evaluateRecordQualification, loadQualificationStanda
 
 const tabs = [
   { id: "meets", label: "大会一覧", icon: CalendarDays },
-  { id: "members", label: "メンバー", icon: UsersRound },
-  { id: "times", label: "種目", icon: Timer }
+  { id: "members", label: "メンバー", icon: UsersRound }
 ];
 const CARD_CROP_ASPECT = 1;
 const NAME_READING_PARTS = [
@@ -492,19 +490,6 @@ function App() {
               memberPhotos={state.memberPhotos || {}}
               memberReadings={state.memberReadings || {}}
               memberBirthdates={state.memberBirthdates || {}}
-              onArchiveToggle={handleArchiveToggle}
-              onPhotoUpdate={handlePhotoUpdate}
-              onReadingUpdate={handleReadingUpdate}
-              onBirthdateUpdate={handleBirthdateUpdate}
-            />
-          </section>
-          <section className={`swipePane ${activeTab === "times" ? "activePane" : ""}`} aria-hidden={activeTab !== "times"}>
-            <TimesView
-              records={filteredRecords}
-              memberPhotos={state.memberPhotos || {}}
-              memberReadings={state.memberReadings || {}}
-              memberBirthdates={state.memberBirthdates || {}}
-              archivedMembers={state.archivedMembers || []}
               onArchiveToggle={handleArchiveToggle}
               onPhotoUpdate={handlePhotoUpdate}
               onReadingUpdate={handleReadingUpdate}
@@ -1135,27 +1120,44 @@ function MeetsView({ records, allRecords, upcomingMeets, archivedMembers, member
   return (
     <>
       <section className="meetModeTabs" aria-label="大会の開催状況">
-        <button className={mode === "upcoming" ? "active" : ""} onClick={() => setMode("upcoming")}>開催前</button>
-        <button className={mode === "past" ? "active" : ""} onClick={() => setMode("past")}>開催後</button>
+        <button className={mode === "upcoming" ? "active" : ""} onClick={() => setMode("upcoming")}>開催予定</button>
+        <button className={mode === "past" ? "active" : ""} onClick={() => setMode("past")}>大会結果</button>
+        <button className={mode === "history" ? "active" : ""} onClick={() => setMode("history")}>結果一覧</button>
       </section>
-      <section className="meetList" aria-label="大会一覧">
-        {meets.map((meet) => (
-          <button className="meetCard" key={meet.key} onClick={() => setSelectedMeet(meet)}>
-            <div>
-              <time>{formatMeetDateRange(meet)}</time>
-              <h2>{meet.name}</h2>
-              <p>{meet.place}</p>
-            </div>
-            <span>{meet.status === "upcoming" ? `${new Set(meet.entries.map((entry) => upcomingEventSectionName(entry.event))).size}種目` : `${meet.records.length}件`}</span>
-          </button>
-        ))}
-      </section>
-      {meets.length === 0 ? (
-        <EmptyState
-          title={mode === "upcoming" ? "出場予定の大会はありません" : "保存済みの大会はありません"}
-          text={mode === "upcoming" ? "RSケーニーズのエントリーが取得されると自動表示されます。" : "記録が取得されるとここに自動表示されます。"}
+      {mode === "history" ? (
+        <TimesView
+          records={records}
+          memberPhotos={memberPhotos}
+          memberReadings={memberReadings}
+          memberBirthdates={memberBirthdates}
+          archivedMembers={archivedMembers}
+          onArchiveToggle={onArchiveToggle}
+          onPhotoUpdate={onPhotoUpdate}
+          onReadingUpdate={onReadingUpdate}
+          onBirthdateUpdate={onBirthdateUpdate}
         />
-      ) : null}
+      ) : (
+        <>
+          <section className="meetList" aria-label="大会一覧">
+            {meets.map((meet) => (
+              <button className="meetCard" key={meet.key} onClick={() => setSelectedMeet(meet)}>
+                <div>
+                  <time>{formatMeetDateRange(meet)}</time>
+                  <h2>{meet.name}</h2>
+                  <p>{meet.place}</p>
+                </div>
+                <span>{meet.status === "upcoming" ? `${new Set(meet.entries.map((entry) => upcomingEventSectionName(entry.event))).size}種目` : `${meet.records.length}件`}</span>
+              </button>
+            ))}
+          </section>
+          {meets.length === 0 ? (
+            <EmptyState
+              title={mode === "upcoming" ? "出場予定の大会はありません" : "保存済みの大会はありません"}
+              text={mode === "upcoming" ? "RSケーニーズのエントリーが取得されると自動表示されます。" : "記録が取得されるとここに自動表示されます。"}
+            />
+          ) : null}
+        </>
+      )}
       {selectedMeet ? (
         <MeetModal
           meet={selectedMeet}
