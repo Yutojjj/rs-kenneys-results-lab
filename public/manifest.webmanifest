@@ -1,0 +1,17 @@
+{
+  "name": "RSケーニーズ 記録アーカイブ LAB",
+  "short_name": "RS記録LAB",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f7fbfb",
+  "theme_color": "#0f766e",
+  "description": "保存済みデータベースからRSケーニーズの記録を確認する実験版です。",
+  "icons": [
+    {
+      "src": "/icons/app-icon.png",
+      "sizes": "1024x1024",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

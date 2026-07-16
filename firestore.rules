@@ -1,0 +1,15 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /boards/rs-kenneys-results-lab {
+      allow read: if true;
+      allow write: if true;
+
+      match /recordChunks/{chunkId} {
+        allow read: if true;
+        allow write: if true;
+      }
+    }
+  }
+}
