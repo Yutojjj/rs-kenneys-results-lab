@@ -1169,7 +1169,11 @@ function MeetsView({ records, allRecords, upcomingMeets, archivedMembers, member
                   <h2>{meet.name}</h2>
                   <p>{meet.place}</p>
                 </div>
-                <span>{meet.status === "upcoming" ? `${new Set(meet.entries.map((entry) => upcomingEventSectionName(entry.event))).size}種目` : `${meet.records.length}件`}</span>
+                <span>
+                  {meet.status === "upcoming"
+                    ? `${new Set(meet.entries.map((entry) => normalizeMemberName(entry.swimmer))).size}名 / ${new Set(meet.entries.map((entry) => upcomingEventSectionName(entry.event))).size}種目`
+                    : `${meet.records.length}件`}
+                </span>
               </button>
             ))}
           </section>
