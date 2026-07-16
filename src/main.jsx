@@ -1194,38 +1194,77 @@ function MeetModal({ meet, records, allRecords, archivedMembers, memberPhotos, m
       />
     );
   }
-  return <PastMeetModal meet={meet} records={records} memberBirthdates={memberBirthdates} memberReadings={memberReadings} onClose={onClose} />;
+  return (
+    <PastMeetModal
+      meet={meet}
+      records={records}
+      archivedMembers={archivedMembers}
+      memberPhotos={memberPhotos}
+      memberBirthdates={memberBirthdates}
+      memberReadings={memberReadings}
+      onArchiveToggle={onArchiveToggle}
+      onPhotoUpdate={onPhotoUpdate}
+      onReadingUpdate={onReadingUpdate}
+      onBirthdateUpdate={onBirthdateUpdate}
+      onClose={onClose}
+    />
+  );
 }
 
-function PastMeetModal({ meet, records, memberBirthdates, memberReadings, onClose }) {
+function PastMeetModal({ meet, records, archivedMembers, memberPhotos, memberBirthdates, memberReadings, onArchiveToggle, onPhotoUpdate, onReadingUpdate, onBirthdateUpdate, onClose }) {
   const [genderFilters, setGenderFilters] = useState([]);
   const [ageFilter, setAgeFilter] = useState("all");
   const [classFilter, setClassFilter] = useState("all");
   const [eventFilter, setEventFilter] = useState("all");
-  const emptyPhotos = useMemo(() => ({}), []);
-  const members = useQualifiedMembers(records, emptyPhotos, memberReadings, memberBirthdates);
-  const memberByName = useMemo(() => new Map(members.map((member) => [member.name, member])), [members]);
+  const [selectedMember, setSelectedMember] = useState(null);
+  const members = useQualifiedMembers(records, memberPhotos, memberReadings, memberBirthdates);
+  const memberByKey = useMemo(() => new Map(members.map((member) => [normalizeMemberName(member.name), member])), [members]);
   const meetRecords = useMemo(() => meet.records.map((record) => {
-    const member = memberByName.get(record.swimmer);
+    const memberKey = normalizeMemberName(record.swimmer);
+    const member = memberByKey.get(memberKey);
+    const memberRecords = records.filter((item) => normalizeMemberName(item.swimmer) === memberKey);
     return {
       ...record,
       gender: record.gender || getGender(record.event) || member?.gender || "",
       age: member?.age || calculateAge(memberBirthdates[record.swimmer]) || "",
-      swimClass: member?.swimClass || ""
+      swimClass: member?.swimClass || "",
+      reading: memberReadings[record.swimmer] || member?.reading || getNameReading(record.swimmer),
+      best: findBestForEvent(memberRecords, record.event)
     };
-  }), [meet.records, memberByName, memberBirthdates]);
+  }), [meet.records, records, memberByKey, memberBirthdates, memberReadings]);
   const options = useMemo(() => ({
     ages: Array.from(new Set(meetRecords.map((record) => record.age).filter((value) => value !== ""))).sort((a, b) => a - b),
     classes: Array.from(new Set(meetRecords.map((record) => record.swimClass).filter(Boolean))).sort(compareSwimClass),
-    events: Array.from(new Set(meetRecords.map((record) => record.event).filter(Boolean))).sort((a, b) => a.localeCompare(b, "ja"))
+    events: Array.from(new Set(meetRecords.map((record) => upcomingEventSectionName(record.event)).filter(Boolean))).sort((a, b) => a.localeCompare(b, "ja"))
   }), [meetRecords]);
   const filteredRecords = meetRecords.filter((record) => {
     if (genderFilters.length && !genderFilters.includes(record.gender)) return false;
     if (ageFilter !== "all" && String(record.age) !== ageFilter) return false;
     if (classFilter !== "all" && record.swimClass !== classFilter) return false;
-    if (eventFilter !== "all" && record.event !== eventFilter) return false;
+    if (eventFilter !== "all" && upcomingEventSectionName(record.event) !== eventFilter) return false;
     return true;
   });
+  const groupedRecords = useMemo(() => groupMeetRecordsByEvent(filteredRecords), [filteredRecords]);
+
+  function openMember(record) {
+    const existing = memberByKey.get(normalizeMemberName(record.swimmer));
+    if (existing) {
+      setSelectedMember(existing);
+      return;
+    }
+    setSelectedMember({
+      name: record.swimmer,
+      records: [],
+      events: [],
+      photoUrl: memberPhotos[record.swimmer] || "",
+      reading: record.reading || "",
+      gender: record.gender || "",
+      birthdate: memberBirthdates[record.swimmer] || "",
+      age: record.age || "",
+      swimClass: record.swimClass || "",
+      overallBest: record.best || null
+    });
+  }
 
   return (
     <>
@@ -1273,26 +1312,46 @@ function PastMeetModal({ meet, records, memberBirthdates, memberReadings, onClos
             </select>
           </label>
         </section>
-          <section className="recordHistory meetRecords">
-            {filteredRecords.map((record) => (
-              <article className="meetRecordRow" key={record.id}>
-                <div className="meetRecordName">
-                  <strong>{record.swimmer}</strong>
-                  <span>{[record.age !== "" ? `${record.age}歳` : "", record.swimClass].filter(Boolean).join(" / ") || "-"}</span>
+          <section className="pastMeetResultList">
+            {groupedRecords.map((group) => (
+              <section className={`pastMeetEventSection ${eventColorClassName(group.eventName)}`} key={group.eventName}>
+                <header>
+                  <h3>{group.eventName}</h3>
+                  <span>{group.records.length}名</span>
+                </header>
+                <div className="pastMeetResultGrid">
+                  {group.records.map((record) => (
+                    <button className="pastMeetResultCard" key={record.id} onClick={() => openMember(record)}>
+                      <div className="pastMeetResultMember">
+                        {record.reading ? <small>{record.reading}</small> : null}
+                        <strong>{record.swimmer}</strong>
+                        <span>{[record.age !== "" ? `${record.age}歳` : "", record.swimClass, formatRank(record.rank)].filter(Boolean).join(" / ") || "-"}</span>
+                      </div>
+                      <div className="pastMeetResultTimes">
+                        <span>今回</span>
+                        <strong>{formatTime(record.time)}</strong>
+                        <em>BEST {record.best ? formatTime(record.best.time) : "記録なし"}</em>
+                      </div>
+                    </button>
+                  ))}
                 </div>
-                <div className="meetRecordEvent">
-                  <span>{record.event}</span>
-                </div>
-                <div className="meetRecordTime">
-                  <strong>{formatTime(record.time)}</strong>
-                  <span>{formatRank(record.rank) || "-"}</span>
-                </div>
-              </article>
+              </section>
             ))}
           </section>
           {!filteredRecords.length ? <EmptyState title="該当する記録がありません" text="絞り込み条件を変更してください。" /> : null}
       </section>
     </div>
+      {selectedMember ? (
+        <MemberModal
+          member={selectedMember}
+          isArchived={archivedMembers.includes(selectedMember.name)}
+          onArchiveToggle={onArchiveToggle}
+          onPhotoUpdate={onPhotoUpdate}
+          onReadingUpdate={onReadingUpdate}
+          onBirthdateUpdate={onBirthdateUpdate}
+          onClose={() => setSelectedMember(null)}
+        />
+      ) : null}
     </>
   );
 }
@@ -1826,6 +1885,24 @@ function groupUpcomingEntries(entries) {
   return Array.from(byEvent, ([eventName, eventEntries]) => ({
     eventName,
     entries: [...eventEntries].sort((a, b) => a.swimmer.localeCompare(b.swimmer, "ja"))
+  })).sort((a, b) => a.eventName.localeCompare(b.eventName, "ja"));
+}
+
+function groupMeetRecordsByEvent(records) {
+  const byEvent = new Map();
+  records.forEach((record) => {
+    const eventName = upcomingEventSectionName(record.event) || "種目未取得";
+    const current = byEvent.get(eventName) || [];
+    current.push(record);
+    byEvent.set(eventName, current);
+  });
+  return Array.from(byEvent, ([eventName, eventRecords]) => ({
+    eventName,
+    records: [...eventRecords].sort((a, b) => {
+      const timeDiff = timeToMilliseconds(a.time) - timeToMilliseconds(b.time);
+      if (Number.isFinite(timeDiff) && timeDiff !== 0) return timeDiff;
+      return a.swimmer.localeCompare(b.swimmer, "ja");
+    })
   })).sort((a, b) => a.eventName.localeCompare(b.eventName, "ja"));
 }
 

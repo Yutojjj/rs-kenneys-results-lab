@@ -1624,7 +1624,8 @@ h1 {
   padding-left: 48px;
 }
 
-.upcomingEntryList {
+.upcomingEntryList,
+.pastMeetResultList {
   display: grid;
   gap: 12px;
   overflow-y: auto;
@@ -1632,13 +1633,15 @@ h1 {
   -webkit-overflow-scrolling: touch;
 }
 
-.upcomingEventSection {
+.upcomingEventSection,
+.pastMeetEventSection {
   --event-accent: #0f766e;
   display: grid;
   gap: 6px;
 }
 
-.upcomingEventSection > header {
+.upcomingEventSection > header,
+.pastMeetEventSection > header {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1647,14 +1650,16 @@ h1 {
   border-bottom: 3px solid var(--event-accent);
 }
 
-.upcomingEventSection > header h3 {
+.upcomingEventSection > header h3,
+.pastMeetEventSection > header h3 {
   margin: 0;
   color: #102322;
   font-size: 15px;
   line-height: 1.3;
 }
 
-.upcomingEventSection > header span {
+.upcomingEventSection > header span,
+.pastMeetEventSection > header span {
   flex: 0 0 auto;
   color: var(--event-accent);
   font-size: 11px;
@@ -1667,14 +1672,22 @@ h1 {
 .upcomingEventSection.eventMedley { --event-accent: #db2777; }
 .upcomingEventSection.eventMidFree { --event-accent: #0891b2; }
 .upcomingEventSection.eventDistanceFree { --event-accent: #047857; }
+.pastMeetEventSection.eventBreast { --event-accent: #d97706; }
+.pastMeetEventSection.eventBack { --event-accent: #2563eb; }
+.pastMeetEventSection.eventFly { --event-accent: #9333ea; }
+.pastMeetEventSection.eventMedley { --event-accent: #db2777; }
+.pastMeetEventSection.eventMidFree { --event-accent: #0891b2; }
+.pastMeetEventSection.eventDistanceFree { --event-accent: #047857; }
 
-.upcomingEntryGrid {
+.upcomingEntryGrid,
+.pastMeetResultGrid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
   gap: 6px;
 }
 
-.upcomingEntryCard {
+.upcomingEntryCard,
+.pastMeetResultCard {
   display: grid;
   grid-template-columns: minmax(0, 1fr) max-content;
   gap: 6px;
@@ -1691,18 +1704,21 @@ h1 {
   cursor: pointer;
 }
 
-.upcomingEntryCard:active {
+.upcomingEntryCard:active,
+.pastMeetResultCard:active {
   background: #eef8f6;
   transform: translateY(1px);
 }
 
-.upcomingEntryMember {
+.upcomingEntryMember,
+.pastMeetResultMember {
   min-width: 0;
   display: grid;
   gap: 1px;
 }
 
-.upcomingEntryMember small {
+.upcomingEntryMember small,
+.pastMeetResultMember small {
   overflow: hidden;
   color: #64748b;
   font-size: 9px;
@@ -1710,7 +1726,8 @@ h1 {
   white-space: nowrap;
 }
 
-.upcomingEntryMember strong {
+.upcomingEntryMember strong,
+.pastMeetResultMember strong {
   overflow: hidden;
   color: #102322;
   font-size: 15px;
@@ -1718,7 +1735,8 @@ h1 {
   white-space: nowrap;
 }
 
-.upcomingEntryMember span {
+.upcomingEntryMember span,
+.pastMeetResultMember span {
   color: #5c6f6d;
   font-size: 11px;
 }
@@ -1744,17 +1762,46 @@ h1 {
   font-size: 16px;
 }
 
+.pastMeetResultTimes {
+  display: grid;
+  justify-items: end;
+  gap: 1px;
+  white-space: nowrap;
+}
+
+.pastMeetResultTimes span {
+  color: var(--event-accent);
+  font-size: 9px;
+  font-weight: 900;
+}
+
+.pastMeetResultTimes strong {
+  color: #0f766e;
+  font-size: 18px;
+  line-height: 1.05;
+}
+
+.pastMeetResultTimes em {
+  color: #5c6f6d;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 800;
+}
+
 @media (max-width: 520px) {
-  .upcomingEntryList {
+  .upcomingEntryList,
+  .pastMeetResultList {
     padding-inline: 8px;
   }
 
-  .upcomingEntryGrid {
+  .upcomingEntryGrid,
+  .pastMeetResultGrid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 5px;
   }
 
-  .upcomingEntryCard {
+  .upcomingEntryCard,
+  .pastMeetResultCard {
     grid-template-columns: minmax(0, 1fr);
     align-content: space-between;
     min-height: 92px;
@@ -1772,6 +1819,14 @@ h1 {
     max-width: 100%;
     font-size: 15px;
     text-overflow: ellipsis;
+  }
+
+  .pastMeetResultTimes {
+    justify-items: start;
+  }
+
+  .pastMeetResultTimes strong {
+    font-size: 17px;
   }
 }
 
