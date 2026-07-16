@@ -982,6 +982,11 @@ function ReadingEditModal({ member, onReadingUpdate, onClose }) {
     setReadingInput(member.reading || "");
   }, [member]);
 
+  function handleSave() {
+    onReadingUpdate(member.name, readingInput.trim());
+    onClose();
+  }
+
   return (
     <div className="modalBackdrop topModal" role="presentation" onMouseDown={onClose}>
       <section className="readingModal" role="dialog" aria-modal="true" aria-label="検索用よみ" onMouseDown={(event) => event.stopPropagation()}>
@@ -997,13 +1002,18 @@ function ReadingEditModal({ member, onReadingUpdate, onClose }) {
           <input
             autoFocus
             value={readingInput}
-            onChange={(event) => {
-              setReadingInput(event.target.value);
-              onReadingUpdate(member.name, event.target.value);
+            onChange={(event) => setReadingInput(event.target.value)}
+            onCompositionStart={() => {}}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && !event.nativeEvent.isComposing) handleSave();
             }}
             placeholder="例: もりかわ ゆめ"
           />
         </label>
+        <div className="readingEditActions">
+          <button type="button" className="readingCancelButton" onClick={onClose}>キャンセル</button>
+          <button type="button" className="readingSaveButton" onClick={handleSave}>保存</button>
+        </div>
       </section>
     </div>
   );

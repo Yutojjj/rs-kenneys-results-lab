@@ -1365,6 +1365,30 @@ h1 {
   background: #fff;
 }
 
+.readingEditActions {
+  display: grid;
+  grid-template-columns: 1fr 1.4fr;
+  gap: 8px;
+  padding: 0 16px 16px;
+}
+
+.readingEditActions button {
+  min-height: 42px;
+  border: 0;
+  border-radius: 8px;
+  font-weight: 900;
+}
+
+.readingCancelButton {
+  color: #48605d;
+  background: #edf5f3;
+}
+
+.readingSaveButton {
+  color: #fff;
+  background: #0f766e;
+}
+
 .ageSaveButton {
   width: calc(100% - 32px);
   min-height: 42px;
