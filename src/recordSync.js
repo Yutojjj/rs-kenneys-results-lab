@@ -117,7 +117,58 @@ async function fetchViaProxy(settings) {
     throw new Error("取得データの形式が想定と違います。records 配列を返すようにしてください。");
   }
 
+  const rankDetails = await fetchRankDetailsViaProxy(settings, payload.records);
+  if (rankDetails.length) {
+    const detailsByResultId = new Map(rankDetails.map((detail) => [String(detail.resultId), detail]));
+    payload.records = payload.records.map((record) => {
+      const detail = detailsByResultId.get(String(record.resultId || ""));
+      if (!detail) return record;
+      return {
+        ...record,
+        rank: detail.rank || record.rank || "",
+        heat: detail.heat || record.heat || "",
+        lane: detail.lane || record.lane || "",
+        place: detail.place || record.place || "",
+        event: detail.event || record.event,
+        date: detail.date || record.date,
+        time: detail.time || record.time
+      };
+    });
+  }
+
   return payload;
+}
+
+async function fetchRankDetailsViaProxy(settings, records) {
+  const resultIds = Array.from(new Set(records.map((record) => String(record.resultId || "")).filter(Boolean)));
+  const batches = [];
+  for (let index = 0; index < resultIds.length; index += 30) {
+    batches.push(resultIds.slice(index, index + 30));
+  }
+
+  const details = [];
+  for (let index = 0; index < batches.length; index += 3) {
+    const group = batches.slice(index, index + 3);
+    const results = await Promise.all(group.map(async (batch) => {
+      const url = new URL(settings.proxyUrl, window.location.origin);
+      url.searchParams.set("mode", "ranks");
+      url.searchParams.set("resultIds", batch.join(","));
+      url.searchParams.set("refresh", String(Date.now()));
+      try {
+        const response = await fetch(url.toString(), {
+          cache: "no-store",
+          headers: { Accept: "application/json", "Cache-Control": "no-cache" }
+        });
+        if (!response.ok) return [];
+        const payload = await response.json();
+        return Array.isArray(payload.details) ? payload.details : [];
+      } catch {
+        return [];
+      }
+    }));
+    details.push(...results.flat());
+  }
+  return details;
 }
 
 function normalizeRecords(records, teamName) {
@@ -125,6 +176,7 @@ function normalizeRecords(records, teamName) {
     .filter((record) => !record.team || matchesTeam(record.team, teamName))
     .map((record, index) => ({
       id: record.id || stableRecordId(record, index),
+      resultId: record.resultId || "",
       date: record.date || "",
       swimmer: record.swimmer || "選手名未取得",
       event: record.event || "種目未取得",
@@ -228,7 +280,13 @@ function mergeRecordArchive(currentRecords, incomingRecords) {
   });
   incomingRecords.forEach((record, index) => {
     const id = record.id || stableRecordId(record, index);
-    recordsById.set(id, { ...(recordsById.get(id) || {}), ...record, id });
+    const current = recordsById.get(id) || {};
+    recordsById.set(id, {
+      ...current,
+      ...record,
+      rank: record.rank || current.rank || "",
+      id
+    });
   });
   return Array.from(recordsById.values()).sort((a, b) => b.date.localeCompare(a.date));
 }

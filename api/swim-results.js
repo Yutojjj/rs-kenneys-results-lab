@@ -14,6 +14,11 @@ export default async function handler(request, response) {
   }
 
   try {
+    if (request.query?.mode === "ranks") {
+      await respondWithRankDetails(request, response);
+      return;
+    }
+
     const months = clampNumber(request.query?.months, 12, 1, 24);
     const cutoff = createCutoffDate(months);
     const rosterPayload = await fetchOfficialJson("/athletes", {
@@ -57,8 +62,7 @@ export default async function handler(request, response) {
       }
     });
 
-    const rankEnrichment = await enrichRecordsWithResultDetails(dedupeRecords(resultGroups.flat()));
-    const records = rankEnrichment.records.sort((a, b) => b.date.localeCompare(a.date));
+    const records = dedupeRecords(resultGroups.flat()).sort((a, b) => b.date.localeCompare(a.date));
     const upcomingMeets = await upcomingMeetsPromise;
     response.setHeader("Cache-Control", "no-store, max-age=0");
     response.status(200).json({
@@ -71,8 +75,6 @@ export default async function handler(request, response) {
         memberCount: members.length,
         recordCount: records.length,
         rankedRecordCount: records.filter((record) => Boolean(record.rank)).length,
-        rankDetailRequests: rankEnrichment.requested,
-        failedRankDetailRequests: rankEnrichment.failed,
         failedRecordRequests: failedJobs,
         upcomingMeetCount: upcomingMeets.length,
         failedUpcomingMeetRequests: upcomingMeetSyncFailed ? 1 : 0
@@ -87,6 +89,41 @@ export default async function handler(request, response) {
       upcomingMeets: []
     });
   }
+}
+
+async function respondWithRankDetails(request, response) {
+  const resultIds = Array.from(new Set(String(request.query?.resultIds || "")
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean)))
+    .slice(0, 30);
+
+  if (!resultIds.length) {
+    response.status(400).json({ error: "resultIds is required", details: [] });
+    return;
+  }
+
+  let failed = 0;
+  const details = (await mapLimit(resultIds, 8, async (resultId) => {
+    const detail = await fetchResultDetail(resultId);
+    if (!detail) {
+      failed += 1;
+      return null;
+    }
+    return {
+      resultId,
+      rank: extractRank(detail),
+      heat: detail.heat || "",
+      lane: detail.lane || "",
+      place: detail.game?.pool || detail.place || "",
+      event: buildEventNameFromDetail(detail),
+      date: normalizeDate(detail.result_date),
+      time: detail.result_time || ""
+    };
+  })).filter(Boolean);
+
+  response.setHeader("Cache-Control", "no-store, max-age=0");
+  response.status(200).json({ details, requested: resultIds.length, failed });
 }
 
 async function fetchUpcomingMeets() {
@@ -237,35 +274,6 @@ function normalizeOfficialRecords(payload, job, cutoff) {
     }
   }
   return records;
-}
-
-async function enrichRecordsWithResultDetails(records) {
-  let requested = 0;
-  let failed = 0;
-  const enrichedRecords = await mapLimit(records, 10, async (record) => {
-    if (!record.resultId) return record;
-
-    requested += 1;
-
-    const detail = await fetchResultDetail(record.resultId);
-    if (!detail) {
-      failed += 1;
-      return record;
-    }
-
-    return {
-      ...record,
-      rank: extractRank(detail) || record.rank || "",
-      heat: detail.heat || record.heat || "",
-      lane: detail.lane || record.lane || "",
-      place: detail.game?.pool || detail.place || record.place || "",
-      event: buildEventNameFromDetail(detail) || record.event,
-      date: normalizeDate(detail.result_date) || record.date,
-      time: detail.result_time || record.time
-    };
-  });
-
-  return { records: enrichedRecords, requested, failed };
 }
 
 async function fetchResultDetail(resultId) {
