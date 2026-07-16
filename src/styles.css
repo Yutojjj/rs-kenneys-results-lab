@@ -43,6 +43,7 @@ button {
 }
 
 .app.tab-meets {
+  padding-top: calc(var(--tab-height) + 48px);
   padding-bottom: calc(158px + env(safe-area-inset-bottom));
 }
 
@@ -177,7 +178,7 @@ h1 {
   position: fixed;
   left: 50%;
   top: auto;
-  bottom: calc(var(--tab-height) + env(safe-area-inset-bottom) + 16px + var(--keyboard-offset, 0px));
+  bottom: calc(env(safe-area-inset-bottom) + 8px + var(--keyboard-offset, 0px));
   z-index: 17;
   width: var(--dock-width);
   display: flex;
@@ -193,10 +194,6 @@ h1 {
   transform: translateX(-50%);
   transition: transform 180ms ease, opacity 180ms ease;
   backdrop-filter: blur(10px);
-}
-
-.app.tab-members .controls {
-  bottom: calc(env(safe-area-inset-bottom) + 8px + var(--keyboard-offset, 0px));
 }
 
 .searchBox {
@@ -1019,42 +1016,56 @@ h1 {
 .meetModeTabs {
   position: fixed;
   left: 50%;
-  top: auto;
-  bottom: calc(env(safe-area-inset-bottom) + 8px + var(--keyboard-offset, 0px));
-  z-index: 16;
+  top: calc(env(safe-area-inset-top) + var(--tab-height) + 5px);
+  bottom: auto;
+  z-index: 17;
   width: var(--dock-width);
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 6px;
+  gap: 0;
   margin: 0;
-  padding: 4px;
-  border: 1px solid #cfe2df;
-  border-radius: 10px;
-  background: rgba(238, 247, 245, 0.94);
-  box-shadow: 0 -4px 16px rgba(16, 35, 34, 0.09);
+  padding: 2px 4px 0;
+  border: 1px solid rgba(207, 226, 223, 0.86);
+  border-radius: 0 0 10px 10px;
+  background: rgba(247, 251, 251, 0.95);
+  box-shadow: 0 5px 14px rgba(16, 35, 34, 0.07);
   transform: translateX(-50%);
   transition: transform 180ms ease, opacity 180ms ease;
   backdrop-filter: blur(10px);
 }
 
 .meetModeTabs button {
-  min-height: 38px;
+  position: relative;
+  min-height: 30px;
   border: 0;
-  border-radius: 8px;
+  border-radius: 0;
   color: #48605d;
   background: transparent;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 900;
 }
 
+.meetModeTabs button::after {
+  content: "";
+  position: absolute;
+  left: 18%;
+  right: 18%;
+  bottom: 0;
+  height: 3px;
+  border-radius: 999px 999px 0 0;
+  background: transparent;
+}
+
 .meetModeTabs button.active {
-  color: #fff;
+  color: #0f766e;
+}
+
+.meetModeTabs button.active::after {
   background: #0f766e;
-  box-shadow: 0 4px 12px rgba(15, 118, 110, 0.22);
 }
 
 .meetsView.historyMode .eventFilterBar {
-  bottom: calc(var(--control-dock-height) + var(--tab-height) + env(safe-area-inset-bottom) + 24px + var(--keyboard-offset, 0px));
+  bottom: calc(var(--control-dock-height) + env(safe-area-inset-bottom) + 8px + var(--keyboard-offset, 0px));
 }
 
 .meetCard {
@@ -2197,6 +2208,7 @@ h1 {
   }
 
   .app.tab-meets {
+    padding-top: calc(var(--tab-height) + 44px);
     padding-bottom: calc(158px + env(safe-area-inset-bottom));
   }
 
