@@ -184,7 +184,7 @@ h1 {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: 0;
   margin: 0;
   padding: 4px;
   border: 1px solid rgba(207, 226, 223, 0.92);
@@ -206,6 +206,11 @@ h1 {
   border: 1px solid #cfe2df;
   border-radius: 8px;
   background: #fff;
+}
+
+.controls .searchBox {
+  width: 100%;
+  flex: 1 1 100%;
 }
 
 .searchBox input {
@@ -459,6 +464,40 @@ h1 {
   color: inherit;
   background: #fff;
   cursor: pointer;
+}
+
+.archiveMemberCard {
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 6px;
+  border-color: #d2d7da;
+  color: #425156;
+  background: #eef0f2;
+  text-align: center;
+}
+
+.archiveMemberCard svg {
+  color: #6b7780;
+}
+
+.archiveMemberCard strong {
+  max-width: 100%;
+  color: #344249;
+  font-size: 12px;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.archiveMemberCard span {
+  color: #6b7780;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.archiveMemberCard:active {
+  background: #e2e5e8;
 }
 
 .memberCard > img {
@@ -739,10 +778,10 @@ h1 {
   justify-content: space-between;
   gap: 8px;
   padding: 5px 6px;
-  border: 0;
+  border: 1px solid #c8dfe7;
   border-radius: 6px;
   color: inherit;
-  background: #fff8e8;
+  background: #eef7fa;
   text-align: left;
   cursor: pointer;
 }
@@ -750,7 +789,7 @@ h1 {
 .timeMeetHeader h2 {
   min-width: 0;
   margin: 0;
-  color: #102322;
+  color: #155b70;
   font-size: 14px;
   line-height: 1.25;
   letter-spacing: 0;
@@ -771,13 +810,13 @@ h1 {
 }
 
 .timeMeetHeader b {
-  color: #0f766e;
+  color: #24758c;
   font-size: 10px;
   white-space: nowrap;
 }
 
 .timeMeetHeader:active {
-  background: #fff1ce;
+  background: #deeff4;
 }
 
 .timeGrid {
@@ -1533,12 +1572,21 @@ h1 {
 }
 
 .eventBestCard {
+  --event-accent: #0f766e;
   min-width: 0;
   overflow: hidden;
   border: 1px solid #d6e8e6;
   border-radius: 8px;
-  background: #fff;
+  background: #f3faf9;
+  background: color-mix(in srgb, var(--event-accent) 7%, #fff);
 }
+
+.eventBestCard.eventBreast { --event-accent: #d97706; }
+.eventBestCard.eventBack { --event-accent: #2563eb; }
+.eventBestCard.eventFly { --event-accent: #9333ea; }
+.eventBestCard.eventMedley { --event-accent: #db2777; }
+.eventBestCard.eventMidFree { --event-accent: #0891b2; }
+.eventBestCard.eventDistanceFree { --event-accent: #047857; }
 
 .eventBestCard > button {
   position: relative;
@@ -1552,7 +1600,7 @@ h1 {
   padding: 9px 10px;
   border: 0;
   color: inherit;
-  background: #f8fcfb;
+  background: transparent;
   text-align: left;
   cursor: pointer;
 }

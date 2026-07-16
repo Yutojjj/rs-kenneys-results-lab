@@ -2,11 +2,11 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { createRoot } from "react-dom/client";
 import {
+  Archive,
   Camera,
   CalendarDays,
   ImagePlus,
   Search,
-  Settings,
   Trophy,
   UsersRound,
   WifiOff
@@ -26,7 +26,6 @@ function App() {
   const [state, setState] = useState(() => getStoredState());
   const [query, setQuery] = useState("");
   const [error, setError] = useState("");
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const [isDockHidden, setIsDockHidden] = useState(false);
   const [keyboardOffset, setKeyboardOffset] = useState(0);
   const queryReadyRef = useRef(false);
@@ -272,9 +271,6 @@ function App() {
             placeholder="選手名・大会名で検索"
           />
         </label>
-        <button className="settingsButton" onClick={() => setSettingsOpen(true)} aria-label="設定">
-          <Settings size={16} />
-        </button>
       </div>
 
       <div className="pageSurface">
@@ -293,20 +289,6 @@ function App() {
           query={query}
         />
       </div>
-      {settingsOpen ? (
-        <SettingsModal
-          records={state.recentResults}
-          archivedMembers={state.archivedMembers || []}
-          memberPhotos={state.memberPhotos || {}}
-          memberReadings={state.memberReadings || {}}
-          memberBirthdates={state.memberBirthdates || {}}
-          onArchiveToggle={handleArchiveToggle}
-          onPhotoUpdate={handlePhotoUpdate}
-          onReadingUpdate={handleReadingUpdate}
-          onBirthdateUpdate={handleBirthdateUpdate}
-          onClose={() => setSettingsOpen(false)}
-        />
-      ) : null}
     </main>
   );
 }
@@ -343,12 +325,13 @@ function useQualifiedMembers(records, memberPhotos, memberReadings, memberBirthd
     })), [baseMembers, qualifications]);
 }
 
-function MembersView({ records, archivedMembers, memberPhotos, memberReadings, memberBirthdates, onArchiveToggle, onPhotoUpdate, onReadingUpdate, onBirthdateUpdate }) {
+function MembersView({ records, archiveRecords = records, archivedMembers, memberPhotos, memberReadings, memberBirthdates, onArchiveToggle, onPhotoUpdate, onReadingUpdate, onBirthdateUpdate }) {
   const [selectedMember, setSelectedMember] = useState(null);
   const [uploadMember, setUploadMember] = useState(null);
   const [readingMember, setReadingMember] = useState(null);
   const [birthdateMember, setBirthdateMember] = useState(null);
   const [actionMember, setActionMember] = useState(null);
+  const [archiveOpen, setArchiveOpen] = useState(false);
   const [genderFilters, setGenderFilters] = useState([]);
   const [ageFilter, setAgeFilter] = useState("all");
   const [classFilter, setClassFilter] = useState("all");
@@ -445,8 +428,15 @@ function MembersView({ records, archivedMembers, memberPhotos, memberReadings, m
             onActionRequest={() => setActionMember(member)}
           />
         ))}
+        <div className="memberCardWrap">
+          <button className="memberCard archiveMemberCard" onClick={() => setArchiveOpen(true)}>
+            <Archive size={24} strokeWidth={2} />
+            <strong>アーカイブ済み</strong>
+            <span>{archivedMembers.length}名</span>
+          </button>
+        </div>
       </section>
-      {members.length === 0 ? <EmptyState title="表示中の選手がいません" text="設定からアーカイブ済み選手を戻すと表示されます。" /> : null}
+      {members.length === 0 ? <EmptyState title="表示中の選手がいません" text="絞り込み条件を変更するか、アーカイブ済みカードを確認してください。" /> : null}
       {selectedMember ? (
         <MemberModal
           member={selectedMember}
@@ -507,6 +497,20 @@ function MembersView({ records, archivedMembers, memberPhotos, memberReadings, m
             setActionMember(null);
           }}
           onClose={() => setActionMember(null)}
+        />
+      ) : null}
+      {archiveOpen ? (
+        <SettingsModal
+          records={archiveRecords}
+          archivedMembers={archivedMembers}
+          memberPhotos={memberPhotos}
+          memberReadings={memberReadings}
+          memberBirthdates={memberBirthdates}
+          onArchiveToggle={onArchiveToggle}
+          onPhotoUpdate={onPhotoUpdate}
+          onReadingUpdate={onReadingUpdate}
+          onBirthdateUpdate={onBirthdateUpdate}
+          onClose={() => setArchiveOpen(false)}
         />
       ) : null}
     </>
@@ -660,7 +664,7 @@ function MemberModal({ member, isArchived = false, onArchiveToggle, onPhotoUpdat
             {filteredEventSummaries.map(({ eventName, best, records }) => {
               const expanded = expandedEvent === eventName;
               return (
-                <article className={`eventBestCard ${expanded ? "expanded" : ""}`} key={eventName}>
+                <article className={`eventBestCard ${eventColorClassName(eventName)} ${expanded ? "expanded" : ""}`} key={eventName}>
                   <button onClick={() => setExpandedEvent(expanded ? "" : eventName)}>
                     <div className="eventBestMain">
                       <span>{eventName}</span>
@@ -1083,6 +1087,7 @@ function MeetsView({ records, allRecords, upcomingMeets, archivedMembers, member
       return (
         <MembersView
           records={records}
+          archiveRecords={allRecords}
           archivedMembers={archivedMembers}
           memberPhotos={memberPhotos}
           memberReadings={memberReadings}
@@ -1511,8 +1516,8 @@ function SettingsModal({ records, archivedMembers, memberPhotos, memberReadings,
         <section className="settingsModal" role="dialog" aria-modal="true" aria-label="設定" onMouseDown={(event) => event.stopPropagation()}>
           <header className="modalHeader">
             <div>
-              <p className="eyebrow">設定</p>
-              <h2>アーカイブ選手</h2>
+              <p className="eyebrow">選手管理</p>
+              <h2>アーカイブ済み</h2>
               <span>退会・休会などで普段表示しない選手をここで管理します。</span>
             </div>
             <button className="iconButton closeButton" onClick={onClose} aria-label="閉じる">×</button>
