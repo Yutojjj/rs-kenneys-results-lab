@@ -57,7 +57,7 @@ export default async function handler(request, response) {
       }
     });
 
-    const records = dedupeRecords(resultGroups.flat()).sort((a, b) => b.date.localeCompare(a.date));
+    const records = (await enrichRecordsWithResultDetails(dedupeRecords(resultGroups.flat()))).sort((a, b) => b.date.localeCompare(a.date));
     const upcomingMeets = await upcomingMeetsPromise;
     response.setHeader("Cache-Control", "s-maxage=300, stale-while-revalidate=900");
     response.status(200).json({
@@ -233,6 +233,50 @@ function normalizeOfficialRecords(payload, job, cutoff) {
     }
   }
   return records;
+}
+
+async function enrichRecordsWithResultDetails(records) {
+  return mapLimit(records, 12, async (record) => {
+    if (!record.resultId || record.rank) return record;
+
+    const detail = await fetchResultDetail(record.resultId);
+    if (!detail) return record;
+
+    return {
+      ...record,
+      rank: extractRank(detail) || record.rank || "",
+      heat: detail.heat || record.heat || "",
+      lane: detail.lane || record.lane || "",
+      place: detail.game?.pool || detail.place || record.place || "",
+      event: buildEventNameFromDetail(detail) || record.event,
+      date: normalizeDate(detail.result_date) || record.date,
+      time: detail.result_time || record.time
+    };
+  });
+}
+
+async function fetchResultDetail(resultId) {
+  try {
+    return await fetchOfficialJson(`/results/${encodeURIComponent(resultId)}`, { is_relay: 0 });
+  } catch (error) {
+    try {
+      return await fetchOfficialJson(`/results/${encodeURIComponent(resultId)}`, { is_relay: 1 });
+    } catch {
+      console.warn(`Result detail fetch failed for ${resultId}`, error.message);
+      return null;
+    }
+  }
+}
+
+function buildEventNameFromDetail(detail) {
+  const game = detail?.game || {};
+  const gender = game.gender?.name || "";
+  const className = game.class?.name || "";
+  const distance = game.distance?.name || "";
+  const style = game.swimming_style?.name || "";
+  const division = game.division?.name || "";
+  const waterway = game.waterway?.name ? `(${game.waterway.name})` : "";
+  return [gender, className, distance, style, division, waterway].filter(Boolean).join(" ");
 }
 
 function extractRank(result) {
