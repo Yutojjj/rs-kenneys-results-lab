@@ -1571,6 +1571,38 @@ h1 {
   white-space: nowrap;
 }
 
+.rankValue {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 22px;
+  padding: 1px 5px;
+  border-radius: 5px;
+  color: #164e4a;
+  font-size: 14px;
+  font-weight: 900;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.rankFirst {
+  color: #7a4600;
+  background: #ffe38a;
+  box-shadow: inset 3px 0 #d89b00;
+}
+
+.rankSecond {
+  color: #45545d;
+  background: #e5ecef;
+  box-shadow: inset 3px 0 #91a1a9;
+}
+
+.rankThird {
+  color: #8a3f08;
+  background: #ffe2ca;
+  box-shadow: inset 3px 0 #c46b2d;
+}
+
 .qualificationBadge {
   grid-column: 2;
   grid-row: 2;
@@ -1813,6 +1845,17 @@ h1 {
 .pastMeetResultMember span {
   color: #5c6f6d;
   font-size: 11px;
+}
+
+.pastMeetMemberMeta {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 22px;
+}
+
+.pastMeetMemberMeta .rankValue {
+  font-size: 13px;
 }
 
 .upcomingBestTime {
@@ -2503,6 +2546,12 @@ h1 {
 
   .recordRank {
     font-size: 10px;
+  }
+
+  .recordRank.rankValue {
+    min-height: 20px;
+    padding-inline: 3px;
+    font-size: 13px;
   }
 }
 

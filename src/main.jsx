@@ -882,7 +882,7 @@ function MemberModal({ member, isArchived = false, onArchiveToggle, onPhotoUpdat
                     {member.qualificationByRecord?.[best?.id] ? <span className="qualificationBadge">{member.qualificationByRecord[best.id].label}</span> : null}
                     <div className="eventBestMeta">
                       <time>{formatDateWithWeekday(best?.date)}</time>
-                      <span>{formatRank(best?.rank) || "-"}</span>
+                      <span className={rankClassName(best?.rank)}>{formatRank(best?.rank) || "-"}</span>
                       <span>{best?.meet || "-"}</span>
                     </div>
                     <span className="historyHint">{expanded ? "閉じる" : "履歴を見る"} <b>{expanded ? "⌃" : "⌄"}</b></span>
@@ -900,7 +900,7 @@ function MemberModal({ member, isArchived = false, onArchiveToggle, onPhotoUpdat
                           <time>{formatDateWithWeekday(record.date)}</time>
                           <strong>{record.meet}</strong>
                           <span className="recordTime">{formatTime(record.time)}</span>
-                          <span className="recordRank">{formatRank(record.rank) || "-"}</span>
+                          <span className={`recordRank ${rankClassName(record.rank)}`}>{formatRank(record.rank) || "-"}</span>
                         </article>
                       ))}
                     </div>
@@ -1359,7 +1359,10 @@ function PastMeetModal({ meet, records, archivedMembers, memberPhotos, memberBir
                       <div className="pastMeetResultMember">
                         {record.reading ? <small>{record.reading}</small> : null}
                         <strong>{record.swimmer}</strong>
-                        <span>{[record.age !== "" ? `${record.age}歳` : "", record.swimClass, formatRank(record.rank)].filter(Boolean).join(" / ") || "-"}</span>
+                        <span className="pastMeetMemberMeta">
+                          {[record.age !== "" ? `${record.age}歳` : "", record.swimClass].filter(Boolean).join(" / ") || "-"}
+                          {record.rank ? <b className={rankClassName(record.rank)}>{formatRank(record.rank)}</b> : null}
+                        </span>
                       </div>
                       <div className="pastMeetResultTimes">
                         <span>今回</span>
@@ -2134,6 +2137,14 @@ function gradeOrder(grade) {
 function formatRank(rank) {
   if (!rank) return "";
   return /^\d+$/.test(rank) ? `${rank}位` : rank;
+}
+
+function rankClassName(rank) {
+  const value = Number.parseInt(String(rank || "").replace(/\D/g, ""), 10);
+  if (value === 1) return "rankValue rankFirst";
+  if (value === 2) return "rankValue rankSecond";
+  if (value === 3) return "rankValue rankThird";
+  return "rankValue";
 }
 
 function formatTime(time) {
