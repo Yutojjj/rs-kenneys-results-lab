@@ -1258,13 +1258,53 @@ h1 {
 }
 
 .meetModalHeader {
+  align-items: flex-start;
   padding-top: 12px;
+  padding-right: 12px;
   padding-bottom: 12px;
 }
 
 .meetModalHeader h2 {
   font-size: 24px;
   line-height: 1.15;
+}
+
+.meetModalHeader > div:first-child {
+  min-width: 0;
+}
+
+.meetModalHeaderActions {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.modalFilterButton {
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 10px;
+  border: 1px solid #d8cba9;
+  border-radius: 8px;
+  color: #654d20;
+  background: #fff9e9;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.modalFilterButton.active {
+  border-color: #d8b866;
+  color: #704d13;
+  background: #ffedbd;
+}
+
+.meetModalHeaderActions .closeButton {
+  position: static;
 }
 
 .memberModal {
@@ -1909,6 +1949,10 @@ h1 {
   grid-template-columns: minmax(0, 1fr);
 }
 
+.upcomingEntryGrid {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .upcomingEntryCard,
 .pastMeetResultCard {
   display: grid;
@@ -1916,8 +1960,8 @@ h1 {
   gap: 6px;
   align-items: center;
   min-width: 0;
-  min-height: 70px;
-  padding: 7px 9px;
+  min-height: 56px;
+  padding: 5px 8px;
   border: 1px solid #d6e8e6;
   border-left: 4px solid var(--event-accent);
   border-radius: 8px;
@@ -1926,6 +1970,14 @@ h1 {
   box-shadow: none;
   text-align: left;
   cursor: pointer;
+}
+
+.upcomingEntryCard {
+  grid-template-columns: minmax(92px, 1.25fr) minmax(58px, 0.7fr) minmax(86px, 0.9fr);
+}
+
+.pastMeetResultCard {
+  grid-template-columns: minmax(92px, 1.3fr) minmax(72px, 0.75fr) minmax(78px, 0.78fr) minmax(86px, 0.9fr);
 }
 
 .upcomingEntryCard:active,
@@ -1966,14 +2018,42 @@ h1 {
 }
 
 .pastMeetMemberMeta {
-  display: flex;
+  display: grid;
   align-items: center;
-  gap: 5px;
-  min-height: 22px;
+  justify-items: start;
+  gap: 2px;
+  min-width: 0;
+}
+
+.pastMeetMemberMeta > span {
+  overflow: hidden;
+  max-width: 100%;
+  color: #5c6f6d;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .pastMeetMemberMeta .rankValue {
-  font-size: 13px;
+  min-height: 19px;
+  font-size: 12px;
+}
+
+.upcomingEntryMeta {
+  min-width: 0;
+  display: grid;
+  align-content: center;
+  gap: 1px;
+  color: #5c6f6d;
+  font-size: 10px;
+}
+
+.upcomingEntryMeta strong {
+  overflow: hidden;
+  color: #314b49;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .upcomingBestTime {
@@ -2016,11 +2096,27 @@ h1 {
   line-height: 1.05;
 }
 
-.pastMeetResultTimes em {
+.pastMeetBestTime {
+  min-width: 0;
+  display: grid;
+  justify-items: end;
+  gap: 1px;
+  white-space: nowrap;
+}
+
+.pastMeetBestTime span {
+  color: #7a4f00;
+  font-size: 9px;
+  font-weight: 900;
+}
+
+.pastMeetBestTime strong {
+  overflow: hidden;
+  max-width: 100%;
   color: #5c6f6d;
-  font-size: 10px;
-  font-style: normal;
+  font-size: 14px;
   font-weight: 800;
+  text-overflow: ellipsis;
 }
 
 @media (max-width: 520px) {
@@ -2031,7 +2127,7 @@ h1 {
 
   .upcomingEntryGrid,
   .pastMeetResultGrid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: minmax(0, 1fr);
     gap: 5px;
   }
 
@@ -2041,23 +2137,25 @@ h1 {
 
   .upcomingEntryCard,
   .pastMeetResultCard {
-    grid-template-columns: minmax(0, 1fr);
-    align-content: space-between;
-    min-height: 92px;
-    padding: 7px;
+    align-content: center;
+    min-height: 56px;
+    padding: 5px 7px;
+  }
+
+  .upcomingEntryCard {
+    grid-template-columns: minmax(88px, 1.15fr) minmax(52px, 0.65fr) minmax(82px, 0.9fr);
   }
 
   .pastMeetResultCard {
-    grid-template-columns: minmax(0, 1fr) max-content;
+    grid-template-columns: minmax(82px, 1.15fr) minmax(58px, 0.68fr) minmax(70px, 0.72fr) minmax(76px, 0.82fr);
     align-content: center;
-    min-height: 68px;
-    padding: 7px 9px;
+    min-height: 56px;
+    padding: 5px 7px;
   }
 
   .upcomingBestTime {
-    grid-template-columns: max-content minmax(0, 1fr);
-    align-items: center;
-    justify-items: start;
+    grid-template-columns: minmax(0, 1fr);
+    justify-items: end;
   }
 
   .upcomingBestTime strong {
@@ -2072,7 +2170,11 @@ h1 {
   }
 
   .pastMeetResultTimes strong {
-    font-size: 17px;
+    font-size: 16px;
+  }
+
+  .pastMeetBestTime strong {
+    font-size: 12px;
   }
 }
 
@@ -2582,6 +2684,20 @@ h1 {
   .modalHeader {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .meetModalHeader {
+    align-items: flex-start;
+    flex-direction: row;
+    gap: 8px;
+  }
+
+  .meetModalHeaderActions {
+    margin-left: auto;
+  }
+
+  .meetModalHeader h2 {
+    font-size: 20px;
   }
 
   .memberDetailHeader {

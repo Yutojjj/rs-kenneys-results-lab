@@ -7,6 +7,7 @@ import {
   CalendarDays,
   ImagePlus,
   Search,
+  SlidersHorizontal,
   Trophy,
   UsersRound,
   WifiOff
@@ -1235,6 +1236,7 @@ function MeetModal({ meet, records, allRecords, archivedMembers, memberPhotos, m
 }
 
 function PastMeetModal({ meet, records, archivedMembers, memberPhotos, memberBirthdates, memberReadings, onArchiveToggle, onPhotoUpdate, onReadingUpdate, onBirthdateUpdate, onClose }) {
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [genderFilters, setGenderFilters] = useState([]);
   const [ageFilter, setAgeFilter] = useState("all");
   const [classFilter, setClassFilter] = useState("all");
@@ -1299,9 +1301,20 @@ function PastMeetModal({ meet, records, archivedMembers, memberPhotos, memberBir
             <h2>{meet.name}</h2>
             <span>{formatMeetDateRange(meet)} / {meet.place}</span>
           </div>
-          <button className="iconButton closeButton" onClick={onClose} aria-label="閉じる">×</button>
+          <div className="meetModalHeaderActions">
+            <button
+              type="button"
+              className={`modalFilterButton ${filtersOpen ? "active" : ""}`}
+              aria-expanded={filtersOpen}
+              onClick={() => setFiltersOpen((current) => !current)}
+            >
+              <SlidersHorizontal size={16} />
+              <span>絞り込み</span>
+            </button>
+            <button className="iconButton closeButton" onClick={onClose} aria-label="閉じる">×</button>
+          </div>
         </header>
-        <section className="pastMeetFilters" aria-label="大会記録の絞り込み">
+        {filtersOpen ? <section className="pastMeetFilters" aria-label="大会記録の絞り込み">
           <div className="genderToggle pastMeetGender" aria-label="性別">
             {["男子", "女子"].map((gender) => (
               <button
@@ -1334,7 +1347,7 @@ function PastMeetModal({ meet, records, archivedMembers, memberPhotos, memberBir
               {options.events.map((eventName) => <option key={eventName} value={eventName}>{eventName}</option>)}
             </select>
           </label>
-        </section>
+        </section> : null}
           <section className="pastMeetResultList">
             {groupedRecords.map((group) => (
               <section className={`pastMeetEventSection ${eventColorClassName(group.eventName)}`} key={group.eventName}>
@@ -1348,15 +1361,18 @@ function PastMeetModal({ meet, records, archivedMembers, memberPhotos, memberBir
                       <div className="pastMeetResultMember">
                         {record.reading ? <small>{record.reading}</small> : null}
                         <strong>{record.swimmer}</strong>
-                        <span className="pastMeetMemberMeta">
-                          {[record.age !== "" ? `${record.age}歳` : "", record.swimClass].filter(Boolean).join(" / ") || "-"}
-                          {record.rank ? <b className={rankClassName(record.rank)}>{formatRank(record.rank)}</b> : null}
-                        </span>
+                      </div>
+                      <div className="pastMeetMemberMeta">
+                        <span>{[record.age !== "" ? `${record.age}歳` : "", record.swimClass].filter(Boolean).join(" / ") || "-"}</span>
+                        {record.rank ? <b className={rankClassName(record.rank)}>{formatRank(record.rank)}</b> : <b className="rankValue">-</b>}
                       </div>
                       <div className="pastMeetResultTimes">
                         <span>今回</span>
                         <strong>{formatTime(record.time)}</strong>
-                        <em>BEST {record.best ? formatTime(record.best.time) : "記録なし"}</em>
+                      </div>
+                      <div className="pastMeetBestTime">
+                        <span>BEST</span>
+                        <strong>{record.best ? formatTime(record.best.time) : "記録なし"}</strong>
                       </div>
                     </button>
                   ))}
@@ -1383,6 +1399,7 @@ function PastMeetModal({ meet, records, archivedMembers, memberPhotos, memberBir
 }
 
 function UpcomingMeetModal({ meet, records, archivedMembers, memberPhotos, memberBirthdates, memberReadings, onArchiveToggle, onPhotoUpdate, onReadingUpdate, onBirthdateUpdate, onClose }) {
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [genderFilter, setGenderFilter] = useState("all");
   const [ageFilter, setAgeFilter] = useState("all");
   const [eventFilter, setEventFilter] = useState("all");
@@ -1441,13 +1458,24 @@ function UpcomingMeetModal({ meet, records, archivedMembers, memberPhotos, membe
             <h2>{meet.name}</h2>
             <span>{formatMeetDateRange(meet)} / {meet.place}</span>
           </div>
-          <button className="iconButton closeButton" onClick={onClose} aria-label="閉じる">×</button>
+          <div className="meetModalHeaderActions">
+            <button
+              type="button"
+              className={`modalFilterButton ${filtersOpen ? "active" : ""}`}
+              aria-expanded={filtersOpen}
+              onClick={() => setFiltersOpen((current) => !current)}
+            >
+              <SlidersHorizontal size={16} />
+              <span>絞り込み</span>
+            </button>
+            <button className="iconButton closeButton" onClick={onClose} aria-label="閉じる">×</button>
+          </div>
         </header>
-        <section className="upcomingEntryFilters" aria-label="出場予定の絞り込み">
+        {filtersOpen ? <section className="upcomingEntryFilters" aria-label="出場予定の絞り込み">
           <label><span>性別</span><select value={genderFilter} onChange={(event) => setGenderFilter(event.target.value)}><option value="all">すべて</option><option value="男子">男子</option><option value="女子">女子</option><option value="混合">混合</option></select></label>
           <label><span>年齢</span><select value={ageFilter} onChange={(event) => setAgeFilter(event.target.value)}><option value="all">すべて</option>{options.ages.map((age) => <option key={age} value={age}>{age}歳</option>)}</select></label>
           <label className="upcomingEventFilter"><span>種目</span><select value={eventFilter} onChange={(event) => setEventFilter(event.target.value)}><option value="all">すべて</option>{options.events.map((eventName) => <option key={eventName} value={eventName}>{eventName}</option>)}</select></label>
-        </section>
+        </section> : null}
         <section className="upcomingEntryList" aria-label="出場予定メンバー">
           {groupedEntries.map((group) => (
             <section className={`upcomingEventSection ${eventColorClassName(group.eventName)}`} key={group.eventName}>
@@ -1461,7 +1489,10 @@ function UpcomingMeetModal({ meet, records, archivedMembers, memberPhotos, membe
                     <div className="upcomingEntryMember">
                       {entry.reading ? <small>{entry.reading}</small> : null}
                       <strong>{entry.swimmer}</strong>
-                      <span>{[entry.gender, entry.age ? `${entry.age}歳` : ""].filter(Boolean).join(" / ")}</span>
+                    </div>
+                    <div className="upcomingEntryMeta">
+                      <span>{entry.gender || "-"}</span>
+                      <strong>{entry.age ? `${entry.age}歳` : "未設定"}</strong>
                     </div>
                     <div className="upcomingBestTime">
                       <span>BEST</span>
