@@ -35,16 +35,16 @@ button {
   width: min(1120px, calc(100% - 24px));
   min-height: 100dvh;
   --dock-width: min(1120px, calc(100% - 16px));
-  --tab-height: 58px;
+  --tab-height: 0px;
   --control-dock-height: 52px;
   margin: 0 auto;
-  padding: 8px 0 calc(178px + env(safe-area-inset-bottom));
+  padding: 8px 0 calc(122px + env(safe-area-inset-bottom));
   touch-action: pan-y;
 }
 
 .app.tab-meets {
   padding-top: calc(58px + env(safe-area-inset-top));
-  padding-bottom: calc(178px + env(safe-area-inset-bottom));
+  padding-bottom: calc(122px + env(safe-area-inset-bottom));
 }
 
 .swipeSurface {
@@ -732,15 +732,22 @@ h1 {
   gap: 6px;
 }
 
-.timeMeetSection > header {
+.timeMeetHeader {
+  width: 100%;
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
   gap: 8px;
-  padding: 0 2px;
+  padding: 5px 6px;
+  border: 0;
+  border-radius: 6px;
+  color: inherit;
+  background: #edf8f6;
+  text-align: left;
+  cursor: pointer;
 }
 
-.timeMeetSection > header h2 {
+.timeMeetHeader h2 {
   min-width: 0;
   margin: 0;
   color: #102322;
@@ -749,11 +756,28 @@ h1 {
   letter-spacing: 0;
 }
 
-.timeMeetSection > header time {
+.timeMeetHeader > span {
+  flex: 0 0 auto;
+  display: grid;
+  justify-items: end;
+  gap: 1px;
+}
+
+.timeMeetHeader time {
   flex: 0 0 auto;
   color: #5c6f6d;
   font-size: 12px;
   font-weight: 800;
+}
+
+.timeMeetHeader b {
+  color: #0f766e;
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.timeMeetHeader:active {
+  background: #dff3ef;
 }
 
 .timeGrid {
@@ -1075,7 +1099,7 @@ h1 {
 }
 
 .meetModeSwipeSurface {
-  min-height: calc(100dvh - 190px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  min-height: calc(100dvh - 132px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
 }
 
 .meetModeSwipeTrack,
@@ -1837,7 +1861,8 @@ h1 {
   border: 1px solid #d6e8e6;
   border-left: 4px solid var(--event-accent);
   border-radius: 8px;
-  background: #fff;
+  background: #f3faf9;
+  background: color-mix(in srgb, var(--event-accent) 7%, #fff);
   box-shadow: none;
   text-align: left;
   cursor: pointer;
@@ -2308,12 +2333,12 @@ h1 {
   .app {
     width: min(100% - 16px, 1120px);
     padding-top: 8px;
-    padding-bottom: calc(178px + env(safe-area-inset-bottom));
+    padding-bottom: calc(122px + env(safe-area-inset-bottom));
   }
 
   .app.tab-meets {
     padding-top: calc(58px + env(safe-area-inset-top));
-    padding-bottom: calc(178px + env(safe-area-inset-bottom));
+    padding-bottom: calc(122px + env(safe-area-inset-bottom));
   }
 
   .controls {

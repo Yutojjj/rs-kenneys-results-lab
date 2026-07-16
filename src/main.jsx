@@ -2,11 +2,9 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
   Camera,
-  CalendarDays,
   ImagePlus,
   Search,
   Settings,
-  UsersRound,
   WifiOff
 } from "lucide-react";
 import "./styles.css";
@@ -14,10 +12,6 @@ import { loadBoardState, saveBoardState, subscribeBoardState, uploadMemberImage 
 import { getStoredState, saveStoredState, syncRecordRanks, syncRecords } from "./recordSync";
 import { bestQualification, evaluateRecordQualification, loadQualificationStandards, qualificationEvent } from "./qualification";
 
-const tabs = [
-  { id: "meets", label: "ホーム", icon: CalendarDays },
-  { id: "members", label: "選手", icon: UsersRound }
-];
 const CARD_CROP_ASPECT = 1;
 const NAME_READING_PARTS = [
   ["森川", "もりかわ"],
@@ -25,7 +19,6 @@ const NAME_READING_PARTS = [
 ];
 
 function App() {
-  const [activeTab, setActiveTab] = useState("meets");
   const [state, setState] = useState(() => getStoredState());
   const [query, setQuery] = useState("");
   const [error, setError] = useState("");
@@ -128,11 +121,6 @@ function App() {
         [memberName]: birthdate || ""
       }
     });
-  }
-
-  function selectTab(tabId) {
-    if (!tabs.some((tab) => tab.id === tabId) || tabId === activeTab) return;
-    setActiveTab(tabId);
   }
 
   useEffect(() => {
@@ -245,7 +233,7 @@ function App() {
 
   return (
     <main
-      className={`app tab-${activeTab} ${isDockHidden ? "dockHidden" : ""}`}
+      className={`app tab-meets ${isDockHidden ? "dockHidden" : ""}`}
       style={{ "--keyboard-offset": `${keyboardOffset}px` }}
     >
       {error ? (
@@ -285,47 +273,21 @@ function App() {
         </button>
       </div>
 
-      <nav className="tabs" aria-label="画面切り替え">
-        {tabs.map((tab) => {
-          const TabIcon = tab.icon;
-          return (
-            <button key={tab.id} className={activeTab === tab.id ? "active" : ""} onClick={() => selectTab(tab.id)}>
-              <TabIcon size={15} strokeWidth={2.2} />
-              <span>{tab.label}</span>
-            </button>
-          );
-        })}
-      </nav>
-
       <div className="pageSurface">
-        {activeTab === "meets" ? (
-          <MeetsView
-            records={filteredRecords}
-            allRecords={state.recentResults}
-            upcomingMeets={state.upcomingMeets || []}
-            archivedMembers={state.archivedMembers || []}
-            memberPhotos={state.memberPhotos || {}}
-            memberBirthdates={state.memberBirthdates || {}}
-            memberReadings={state.memberReadings || {}}
-            onArchiveToggle={handleArchiveToggle}
-            onPhotoUpdate={handlePhotoUpdate}
-            onReadingUpdate={handleReadingUpdate}
-            onBirthdateUpdate={handleBirthdateUpdate}
-            query={query}
-          />
-        ) : (
-          <MembersView
-            records={filteredRecords}
-            archivedMembers={state.archivedMembers || []}
-            memberPhotos={state.memberPhotos || {}}
-            memberReadings={state.memberReadings || {}}
-            memberBirthdates={state.memberBirthdates || {}}
-            onArchiveToggle={handleArchiveToggle}
-            onPhotoUpdate={handlePhotoUpdate}
-            onReadingUpdate={handleReadingUpdate}
-            onBirthdateUpdate={handleBirthdateUpdate}
-          />
-        )}
+        <MeetsView
+          records={filteredRecords}
+          allRecords={state.recentResults}
+          upcomingMeets={state.upcomingMeets || []}
+          archivedMembers={state.archivedMembers || []}
+          memberPhotos={state.memberPhotos || {}}
+          memberBirthdates={state.memberBirthdates || {}}
+          memberReadings={state.memberReadings || {}}
+          onArchiveToggle={handleArchiveToggle}
+          onPhotoUpdate={handlePhotoUpdate}
+          onReadingUpdate={handleReadingUpdate}
+          onBirthdateUpdate={handleBirthdateUpdate}
+          query={query}
+        />
       </div>
       {settingsOpen ? (
         <SettingsModal
@@ -848,7 +810,7 @@ function ReadingEditModal({ member, onReadingUpdate, onClose }) {
   );
 }
 
-function TimesView({ records, memberPhotos, memberReadings, memberBirthdates, archivedMembers, onArchiveToggle, onPhotoUpdate, onReadingUpdate, onBirthdateUpdate }) {
+function TimesView({ records, memberPhotos, memberReadings, memberBirthdates, archivedMembers, onArchiveToggle, onPhotoUpdate, onReadingUpdate, onBirthdateUpdate, onMeetOpen }) {
   const [eventFilter, setEventFilter] = useState("all");
   const [ageFilter, setAgeFilter] = useState("all");
   const [genderFilter, setGenderFilter] = useState("all");
@@ -922,10 +884,20 @@ function TimesView({ records, memberPhotos, memberReadings, memberBirthdates, ar
       <section className="timeMeetSections" aria-label="種目一覧">
         {groupedRecords.map((group) => (
           <section className="timeMeetSection" key={group.key}>
-            <header>
+            <button
+              className="timeMeetHeader"
+              onClick={() => onMeetOpen?.({
+                key: group.key,
+                date: group.date,
+                name: group.meet,
+                place: latestValue(group.records, "place"),
+                records: group.records,
+                status: "past"
+              })}
+            >
               <h2>{group.meet}</h2>
-              <time>{formatDateWithWeekday(group.date)}</time>
-            </header>
+              <span><time>{formatDateWithWeekday(group.date)}</time><b>結果を見る ›</b></span>
+            </button>
             <div className="timeGrid compactTimeGrid">
               {group.records.map((record) => (
                 <button className={`timeCard ${eventColorClassName(record.event)}`} key={record.id} onClick={() => setSelectedMember(memberCards.find((member) => member.name === record.swimmer) || null)}>
@@ -971,9 +943,8 @@ function MeetsView({ records, allRecords, upcomingMeets, archivedMembers, member
   const modeSwipeStartRef = useRef(null);
   const modeSwipeFrameRef = useRef(0);
   const modeSwipeTimerRef = useRef(0);
-  const pastMeets = useMemo(() => buildMeetCards(records), [records]);
   const futureMeets = useMemo(() => buildUpcomingMeetCards(upcomingMeets, query), [upcomingMeets, query]);
-  const modeOrder = ["upcoming", "past", "history"];
+  const modeOrder = ["upcoming", "history", "members"];
   const modeIndex = modeOrder.indexOf(mode);
 
   function setModeSwipeOffset(offset, animate = false) {
@@ -1100,11 +1071,28 @@ function MeetsView({ records, allRecords, upcomingMeets, archivedMembers, member
           onPhotoUpdate={onPhotoUpdate}
           onReadingUpdate={onReadingUpdate}
           onBirthdateUpdate={onBirthdateUpdate}
+          onMeetOpen={setSelectedMeet}
         />
       );
     }
 
-    const paneMeets = paneMode === "upcoming" ? futureMeets : pastMeets;
+    if (paneMode === "members") {
+      return (
+        <MembersView
+          records={records}
+          archivedMembers={archivedMembers}
+          memberPhotos={memberPhotos}
+          memberReadings={memberReadings}
+          memberBirthdates={memberBirthdates}
+          onArchiveToggle={onArchiveToggle}
+          onPhotoUpdate={onPhotoUpdate}
+          onReadingUpdate={onReadingUpdate}
+          onBirthdateUpdate={onBirthdateUpdate}
+        />
+      );
+    }
+
+    const paneMeets = futureMeets;
     return (
       <>
         <section className="meetList" aria-label="大会一覧">
@@ -1125,8 +1113,8 @@ function MeetsView({ records, allRecords, upcomingMeets, archivedMembers, member
         </section>
         {paneMeets.length === 0 ? (
           <EmptyState
-            title={paneMode === "upcoming" ? "出場予定の大会はありません" : "保存済みの大会はありません"}
-            text={paneMode === "upcoming" ? "RSケーニーズのエントリーが取得されると自動表示されます。" : "記録が取得されるとここに自動表示されます。"}
+            title="出場予定の大会はありません"
+            text="RSケーニーズのエントリーが取得されると自動表示されます。"
           />
         ) : null}
       </>
@@ -1144,8 +1132,8 @@ function MeetsView({ records, allRecords, upcomingMeets, archivedMembers, member
         aria-label="大会の開催状況"
       >
         <button className={mode === "upcoming" ? "active" : ""} onClick={() => changeMode("upcoming")}>開催予定</button>
-        <button className={mode === "past" ? "active" : ""} onClick={() => changeMode("past")}>大会結果</button>
-        <button className={mode === "history" ? "active" : ""} onClick={() => changeMode("history")}>結果一覧</button>
+        <button className={mode === "history" ? "active" : ""} onClick={() => changeMode("history")}>記録</button>
+        <button className={mode === "members" ? "active" : ""} onClick={() => changeMode("members")}>選手</button>
       </section>
       <div
         className="swipeSurface meetModeSwipeSurface"
