@@ -869,10 +869,13 @@ function MemberModal({ member, isArchived = false, onArchiveToggle, onPhotoUpdat
                   <button onClick={() => setExpandedEvent(expanded ? "" : eventName)}>
                     <div className="eventBestMain">
                       <span>{eventName}</span>
-                      <strong>{formatTime(best?.time)}</strong>
+                      <div className="eventBestTimeLine">
+                        <strong>{formatTime(best?.time)}</strong>
+                        <em>自己ベスト</em>
+                      </div>
                     </div>
                     {member.qualificationByRecord?.[best?.id] ? <span className="qualificationBadge">{member.qualificationByRecord[best.id].label}</span> : null}
-                    <span className="bestBadge">BEST</span>
+                    <span className="bestBadge">自己ベスト</span>
                     <div className="eventBestMeta">
                       <time>{formatDateWithWeekday(best?.date)}</time>
                       <span>{formatRank(best?.rank) || "-"}</span>

@@ -1488,6 +1488,24 @@ h1 {
   line-height: 1;
 }
 
+.eventBestTimeLine {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.eventBestTimeLine em {
+  flex: 0 0 auto;
+  padding: 2px 6px;
+  border-radius: 999px;
+  color: #8a4a00;
+  background: #fff3c4;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 900;
+}
+
 .eventBestMeta {
   grid-column: 1 / -1;
   display: grid;
@@ -1537,13 +1555,13 @@ h1 {
   justify-self: end;
   display: inline-flex;
   align-items: center;
-  min-height: 24px;
-  padding: 0 9px;
+  min-height: 22px;
+  padding: 0 7px;
   border-radius: 999px;
   color: #7a4f00;
   background: #fde68a;
-  font-size: 12px;
-  font-weight: 800;
+  font-size: 10px;
+  font-weight: 900;
   letter-spacing: 0;
 }
 
