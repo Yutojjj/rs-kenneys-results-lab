@@ -1830,10 +1830,10 @@ function groupUpcomingEntries(entries) {
 }
 
 function findBestForEvent(records, eventName) {
-  const target = qualificationEvent(eventName);
+  const target = qualificationEvent(eventName) || extractEventKey(eventName);
   const targetWaterway = eventWaterway(eventName);
   const matching = records.filter((record) => {
-    const candidate = qualificationEvent(record.event);
+    const candidate = qualificationEvent(record.event) || extractEventKey(record.event);
     if (target && candidate) {
       return target.stroke === candidate.stroke && target.distance === candidate.distance;
     }
@@ -1844,6 +1844,19 @@ function findBestForEvent(records, eventName) {
     ? matching.filter((record) => eventWaterway(record.event) === targetWaterway)
     : [];
   return getBestRecord(sameWaterway.length ? sameWaterway : matching);
+}
+
+function extractEventKey(value) {
+  const text = String(value || "").normalize("NFKC");
+  const distance = Number(text.match(/(\d{2,4})\s*m/i)?.[1] || 0);
+  let stroke = "";
+  if (text.includes("個人メドレー")) stroke = "個人メドレー";
+  else if (text.includes("自由形")) stroke = "自由形";
+  else if (text.includes("背泳ぎ")) stroke = "背泳ぎ";
+  else if (text.includes("平泳ぎ")) stroke = "平泳ぎ";
+  else if (text.includes("バタフライ")) stroke = "バタフライ";
+  if (!distance || !stroke) return null;
+  return { distance, stroke, waterway: eventWaterway(text) };
 }
 
 function eventWaterway(value) {
