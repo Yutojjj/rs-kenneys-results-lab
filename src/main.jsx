@@ -470,7 +470,20 @@ function App() {
           }}
         >
           <section className={`swipePane ${activeTab === "meets" ? "activePane" : ""}`} aria-hidden={activeTab !== "meets"}>
-            <MeetsView records={filteredRecords} upcomingMeets={state.upcomingMeets || []} memberBirthdates={state.memberBirthdates || {}} memberReadings={state.memberReadings || {}} query={query} />
+            <MeetsView
+              records={filteredRecords}
+              allRecords={state.recentResults}
+              upcomingMeets={state.upcomingMeets || []}
+              archivedMembers={state.archivedMembers || []}
+              memberPhotos={state.memberPhotos || {}}
+              memberBirthdates={state.memberBirthdates || {}}
+              memberReadings={state.memberReadings || {}}
+              onArchiveToggle={handleArchiveToggle}
+              onPhotoUpdate={handlePhotoUpdate}
+              onReadingUpdate={handleReadingUpdate}
+              onBirthdateUpdate={handleBirthdateUpdate}
+              query={query}
+            />
           </section>
           <section className={`swipePane ${activeTab === "members" ? "activePane" : ""}`} aria-hidden={activeTab !== "members"}>
             <MembersView
@@ -1112,7 +1125,7 @@ function TimesView({ records, memberPhotos, memberReadings, memberBirthdates, ar
   );
 }
 
-function MeetsView({ records, upcomingMeets, memberBirthdates, memberReadings, query }) {
+function MeetsView({ records, allRecords, upcomingMeets, archivedMembers, memberPhotos, memberBirthdates, memberReadings, onArchiveToggle, onPhotoUpdate, onReadingUpdate, onBirthdateUpdate, query }) {
   const [mode, setMode] = useState("upcoming");
   const [selectedMeet, setSelectedMeet] = useState(null);
   const pastMeets = useMemo(() => buildMeetCards(records), [records]);
@@ -1133,7 +1146,7 @@ function MeetsView({ records, upcomingMeets, memberBirthdates, memberReadings, q
               <h2>{meet.name}</h2>
               <p>{meet.place}</p>
             </div>
-            <span>{meet.status === "upcoming" ? `${meet.entries.length}種目` : `${meet.records.length}件`}</span>
+            <span>{meet.status === "upcoming" ? `${new Set(meet.entries.map((entry) => upcomingEventSectionName(entry.event))).size}種目` : `${meet.records.length}件`}</span>
           </button>
         ))}
       </section>
@@ -1143,14 +1156,43 @@ function MeetsView({ records, upcomingMeets, memberBirthdates, memberReadings, q
           text={mode === "upcoming" ? "RSケーニーズのエントリーが取得されると自動表示されます。" : "記録が取得されるとここに自動表示されます。"}
         />
       ) : null}
-      {selectedMeet ? <MeetModal meet={selectedMeet} records={records} memberBirthdates={memberBirthdates} memberReadings={memberReadings} onClose={() => setSelectedMeet(null)} /> : null}
+      {selectedMeet ? (
+        <MeetModal
+          meet={selectedMeet}
+          records={records}
+          allRecords={allRecords}
+          archivedMembers={archivedMembers}
+          memberPhotos={memberPhotos}
+          memberBirthdates={memberBirthdates}
+          memberReadings={memberReadings}
+          onArchiveToggle={onArchiveToggle}
+          onPhotoUpdate={onPhotoUpdate}
+          onReadingUpdate={onReadingUpdate}
+          onBirthdateUpdate={onBirthdateUpdate}
+          onClose={() => setSelectedMeet(null)}
+        />
+      ) : null}
     </>
   );
 }
 
-function MeetModal({ meet, records, memberBirthdates, memberReadings, onClose }) {
+function MeetModal({ meet, records, allRecords, archivedMembers, memberPhotos, memberBirthdates, memberReadings, onArchiveToggle, onPhotoUpdate, onReadingUpdate, onBirthdateUpdate, onClose }) {
   if (meet.status === "upcoming") {
-    return <UpcomingMeetModal meet={meet} records={records} memberBirthdates={memberBirthdates} memberReadings={memberReadings} onClose={onClose} />;
+    return (
+      <UpcomingMeetModal
+        meet={meet}
+        records={allRecords}
+        archivedMembers={archivedMembers}
+        memberPhotos={memberPhotos}
+        memberBirthdates={memberBirthdates}
+        memberReadings={memberReadings}
+        onArchiveToggle={onArchiveToggle}
+        onPhotoUpdate={onPhotoUpdate}
+        onReadingUpdate={onReadingUpdate}
+        onBirthdateUpdate={onBirthdateUpdate}
+        onClose={onClose}
+      />
+    );
   }
   return <PastMeetModal meet={meet} records={records} memberBirthdates={memberBirthdates} memberReadings={memberReadings} onClose={onClose} />;
 }
@@ -1186,6 +1228,7 @@ function PastMeetModal({ meet, records, memberBirthdates, memberReadings, onClos
   });
 
   return (
+    <>
     <div className="modalBackdrop" role="presentation" onMouseDown={onClose}>
       <section className="settingsModal meetModal" role="dialog" aria-modal="true" aria-label={`${meet.name}の記録`} onMouseDown={(event) => event.stopPropagation()}>
         <header className="modalHeader meetModalHeader">
@@ -1253,33 +1296,57 @@ function PastMeetModal({ meet, records, memberBirthdates, memberReadings, onClos
   );
 }
 
-function UpcomingMeetModal({ meet, records, memberBirthdates, memberReadings, onClose }) {
+function UpcomingMeetModal({ meet, records, archivedMembers, memberPhotos, memberBirthdates, memberReadings, onArchiveToggle, onPhotoUpdate, onReadingUpdate, onBirthdateUpdate, onClose }) {
   const [genderFilter, setGenderFilter] = useState("all");
   const [ageFilter, setAgeFilter] = useState("all");
   const [eventFilter, setEventFilter] = useState("all");
+  const [selectedMember, setSelectedMember] = useState(null);
+  const members = useQualifiedMembers(records, memberPhotos, memberReadings, memberBirthdates);
+  const memberByKey = useMemo(() => new Map(members.map((member) => [normalizeMemberName(member.name), member])), [members]);
   const entries = useMemo(() => meet.entries.map((entry) => {
-    const memberRecords = records.filter((record) => record.swimmer === entry.swimmer);
+    const memberKey = normalizeMemberName(entry.swimmer);
+    const memberRecords = records.filter((record) => normalizeMemberName(record.swimmer) === memberKey);
+    const canonicalName = memberRecords[0]?.swimmer || entry.swimmer;
     const best = findBestForEvent(memberRecords, entry.event);
     return {
       ...entry,
-      reading: entry.reading || memberReadings[entry.swimmer] || getNameReading(entry.swimmer),
+      swimmer: canonicalName,
+      reading: entry.reading || memberReadings[canonicalName] || memberReadings[entry.swimmer] || getNameReading(canonicalName),
       gender: entry.gender || getGender(entry.event) || latestGender(memberRecords),
-      age: entry.age || calculateAge(memberBirthdates[entry.swimmer]) || "",
+      age: entry.age || calculateAge(memberBirthdates[canonicalName] || memberBirthdates[entry.swimmer]) || "",
       best
     };
   }), [meet, records, memberBirthdates, memberReadings]);
   const options = useMemo(() => ({
     ages: Array.from(new Set(entries.map((entry) => entry.age).filter(Boolean))).sort((a, b) => a - b),
-    events: Array.from(new Set(entries.map((entry) => entry.event).filter(Boolean))).sort()
+    events: Array.from(new Set(entries.map((entry) => upcomingEventSectionName(entry.event)).filter(Boolean))).sort()
   }), [entries]);
   const filtered = entries.filter((entry) => {
     if (genderFilter !== "all" && entry.gender !== genderFilter) return false;
     if (ageFilter !== "all" && String(entry.age) !== ageFilter) return false;
-    if (eventFilter !== "all" && entry.event !== eventFilter) return false;
+    if (eventFilter !== "all" && upcomingEventSectionName(entry.event) !== eventFilter) return false;
     return true;
   });
+  const groupedEntries = useMemo(() => groupUpcomingEntries(filtered), [filtered]);
+
+  function openMember(entry) {
+    const existing = memberByKey.get(normalizeMemberName(entry.swimmer));
+    setSelectedMember(existing || {
+      name: entry.swimmer,
+      records: [],
+      events: [],
+      photoUrl: memberPhotos[entry.swimmer] || "",
+      reading: entry.reading || "",
+      gender: entry.gender || "",
+      birthdate: memberBirthdates[entry.swimmer] || "",
+      age: entry.age || "",
+      swimClass: "",
+      overallBest: null
+    });
+  }
 
   return (
+    <>
     <div className="modalBackdrop" role="presentation" onMouseDown={onClose}>
       <section className="settingsModal meetModal upcomingMeetModal" role="dialog" aria-modal="true" aria-label={`${meet.name}の出場予定`} onMouseDown={(event) => event.stopPropagation()}>
         <header className="modalHeader meetModalHeader">
@@ -1296,24 +1363,45 @@ function UpcomingMeetModal({ meet, records, memberBirthdates, memberReadings, on
           <label className="upcomingEventFilter"><span>種目</span><select value={eventFilter} onChange={(event) => setEventFilter(event.target.value)}><option value="all">すべて</option>{options.events.map((eventName) => <option key={eventName} value={eventName}>{eventName}</option>)}</select></label>
         </section>
         <section className="upcomingEntryList" aria-label="出場予定メンバー">
-          {filtered.map((entry) => (
-            <article className={`upcomingEntryCard ${eventColorClassName(entry.event)}`} key={entry.id}>
-              <div className="upcomingEntryMember">
-                {entry.reading ? <small>{entry.reading}</small> : null}
-                <strong>{entry.swimmer}</strong>
-                <span>{[entry.gender, entry.age ? `${entry.age}歳` : ""].filter(Boolean).join(" / ")}</span>
+          {groupedEntries.map((group) => (
+            <section className={`upcomingEventSection ${eventColorClassName(group.eventName)}`} key={group.eventName}>
+              <header>
+                <h3>{group.eventName}</h3>
+                <span>{group.entries.length}名</span>
+              </header>
+              <div className="upcomingEntryGrid">
+                {group.entries.map((entry) => (
+                  <button className="upcomingEntryCard" key={entry.id} onClick={() => openMember(entry)}>
+                    <div className="upcomingEntryMember">
+                      {entry.reading ? <small>{entry.reading}</small> : null}
+                      <strong>{entry.swimmer}</strong>
+                      <span>{[entry.gender, entry.age ? `${entry.age}歳` : ""].filter(Boolean).join(" / ")}</span>
+                    </div>
+                    <div className="upcomingBestTime">
+                      <span>BEST</span>
+                      <strong>{entry.best ? formatTime(entry.best.time) : "記録なし"}</strong>
+                    </div>
+                  </button>
+                ))}
               </div>
-              <p>{entry.event}</p>
-              <div className="upcomingBestTime">
-                <span>BEST</span>
-                <strong>{entry.best ? formatTime(entry.best.time) : "記録なし"}</strong>
-              </div>
-            </article>
+            </section>
           ))}
         </section>
         {!filtered.length ? <EmptyState title="該当する出場予定がありません" text="絞り込み条件を変更してください。" /> : null}
       </section>
     </div>
+      {selectedMember ? (
+        <MemberModal
+          member={selectedMember}
+          isArchived={archivedMembers.includes(selectedMember.name)}
+          onArchiveToggle={onArchiveToggle}
+          onPhotoUpdate={onPhotoUpdate}
+          onReadingUpdate={onReadingUpdate}
+          onBirthdateUpdate={onBirthdateUpdate}
+          onClose={() => setSelectedMember(null)}
+        />
+      ) : null}
+    </>
   );
 }
 
@@ -1720,14 +1808,52 @@ function buildUpcomingMeetCards(meets, query = "") {
     .sort((a, b) => a.date.localeCompare(b.date));
 }
 
+function upcomingEventSectionName(value) {
+  const text = String(value || "").normalize("NFKC").trim();
+  const distanceIndex = text.search(/(?:50|100|200|400|800|1500)m/i);
+  return distanceIndex >= 0 ? text.slice(distanceIndex).trim() : text;
+}
+
+function groupUpcomingEntries(entries) {
+  const byEvent = new Map();
+  entries.forEach((entry) => {
+    const eventName = upcomingEventSectionName(entry.event) || "種目未取得";
+    const current = byEvent.get(eventName) || [];
+    current.push(entry);
+    byEvent.set(eventName, current);
+  });
+  return Array.from(byEvent, ([eventName, eventEntries]) => ({
+    eventName,
+    entries: [...eventEntries].sort((a, b) => a.swimmer.localeCompare(b.swimmer, "ja"))
+  })).sort((a, b) => a.eventName.localeCompare(b.eventName, "ja"));
+}
+
 function findBestForEvent(records, eventName) {
   const target = qualificationEvent(eventName);
+  const targetWaterway = eventWaterway(eventName);
   const matching = records.filter((record) => {
     const candidate = qualificationEvent(record.event);
-    if (target && candidate) return target.stroke === candidate.stroke && target.distance === candidate.distance;
+    if (target && candidate) {
+      return target.stroke === candidate.stroke && target.distance === candidate.distance;
+    }
     return normalizeEventMatchText(record.event) === normalizeEventMatchText(eventName);
   });
-  return matching.length ? getBestRecord(matching) : null;
+  if (!matching.length) return null;
+  const sameWaterway = targetWaterway
+    ? matching.filter((record) => eventWaterway(record.event) === targetWaterway)
+    : [];
+  return getBestRecord(sameWaterway.length ? sameWaterway : matching);
+}
+
+function eventWaterway(value) {
+  const text = String(value || "").normalize("NFKC");
+  if (text.includes("長水路")) return "長水路";
+  if (text.includes("短水路")) return "短水路";
+  return "";
+}
+
+function normalizeMemberName(value) {
+  return String(value || "").normalize("NFKC").replace(/[\s・･]/g, "").toLowerCase();
 }
 
 function normalizeEventMatchText(value) {
