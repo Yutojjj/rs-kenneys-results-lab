@@ -936,6 +936,7 @@ function TimesView({ records, memberPhotos, memberReadings, memberBirthdates, ar
 
 function MeetsView({ records, allRecords, upcomingMeets, archivedMembers, memberPhotos, memberBirthdates, memberReadings, onArchiveToggle, onPhotoUpdate, onReadingUpdate, onBirthdateUpdate, query }) {
   const [mode, setMode] = useState("upcoming");
+  const [visualMode, setVisualMode] = useState("upcoming");
   const [selectedMeet, setSelectedMeet] = useState(null);
   const modeTabsRef = useRef(null);
   const modeSwipeSurfaceRef = useRef(null);
@@ -969,19 +970,23 @@ function MeetsView({ records, allRecords, upcomingMeets, archivedMembers, member
 
   function finishModeSwipe(nextMode, targetOffset) {
     window.clearTimeout(modeSwipeTimerRef.current);
+    setVisualMode(nextMode);
     setModeSwipeOffset(targetOffset, true);
     modeSwipeTimerRef.current = window.setTimeout(() => {
       setMode(nextMode);
-      const track = modeSwipeTrackRef.current;
-      if (track) {
-        track.classList.remove("swipeAnimating");
-        track.style.setProperty("--swipe-offset", "0px");
-      }
-      if (modeTabsRef.current) {
-        modeTabsRef.current.classList.remove("swipeAnimating");
-        modeTabsRef.current.style.setProperty("--meet-mode-drag-offset", "0%");
-      }
-      modeSwipeSurfaceRef.current?.classList.remove("swipeDragging");
+      window.requestAnimationFrame(() => {
+        const track = modeSwipeTrackRef.current;
+        if (track) {
+          track.classList.remove("swipeAnimating");
+          track.style.setProperty("--swipe-offset", "0px");
+        }
+        const tabBar = modeTabsRef.current;
+        if (tabBar) {
+          tabBar.classList.remove("swipeAnimating");
+          tabBar.style.setProperty("--meet-mode-drag-offset", "0%");
+        }
+        modeSwipeSurfaceRef.current?.classList.remove("swipeDragging");
+      });
     }, 220);
   }
 
@@ -1131,9 +1136,9 @@ function MeetsView({ records, allRecords, upcomingMeets, archivedMembers, member
         style={{ "--meet-mode-offset": `${modeIndex * 100}%`, "--meet-mode-drag-offset": "0%" }}
         aria-label="大会の開催状況"
       >
-        <button className={mode === "upcoming" ? "active" : ""} onClick={() => changeMode("upcoming")}>開催予定</button>
-        <button className={mode === "history" ? "active" : ""} onClick={() => changeMode("history")}>記録</button>
-        <button className={mode === "members" ? "active" : ""} onClick={() => changeMode("members")}>選手</button>
+        <button className={visualMode === "upcoming" ? "active" : ""} onClick={() => changeMode("upcoming")}>開催予定</button>
+        <button className={visualMode === "history" ? "active" : ""} onClick={() => changeMode("history")}>大会結果</button>
+        <button className={visualMode === "members" ? "active" : ""} onClick={() => changeMode("members")}>選手管理</button>
       </section>
       <div
         className="swipeSurface meetModeSwipeSurface"

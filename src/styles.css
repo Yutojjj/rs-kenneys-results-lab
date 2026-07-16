@@ -1056,7 +1056,7 @@ h1 {
   left: 5px;
   bottom: 3px;
   width: calc((100% - 10px) / 3);
-  height: 3px;
+  height: 2px;
   border-radius: 999px;
   background: #0f8f84;
   transform: translateX(calc(var(--meet-mode-offset, 0%) + var(--meet-mode-drag-offset, 0%)));
@@ -1081,8 +1081,8 @@ h1 {
 }
 
 .meetModeTabs button.active {
-  color: #0f766e;
-  background: rgba(20, 184, 166, 0.09);
+  color: #287f78;
+  background: rgba(20, 184, 166, 0.055);
 }
 
 .meetModeTabs button.active::after {
