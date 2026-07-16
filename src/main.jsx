@@ -1293,6 +1293,7 @@ function PastMeetModal({ meet, records, memberBirthdates, memberReadings, onClos
           {!filteredRecords.length ? <EmptyState title="該当する記録がありません" text="絞り込み条件を変更してください。" /> : null}
       </section>
     </div>
+    </>
   );
 }
 
