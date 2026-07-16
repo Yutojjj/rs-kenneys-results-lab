@@ -900,7 +900,7 @@ function TimesView({ records, memberPhotos, memberReadings, memberBirthdates, ar
               })}
             >
               <h2>{group.meet}</h2>
-              <span><time>{formatDateWithWeekday(group.date)}</time><b>結果を見る ›</b></span>
+              <span><time>{formatDateWithWeekday(group.date)}</time><b aria-hidden="true">›</b></span>
             </button>
             <div className="timeGrid compactTimeGrid">
               {group.records.map((record) => (
