@@ -77,6 +77,7 @@ export async function syncRecords(previousState) {
   const fetched = settings.proxyUrl ? await fetchViaProxy(settings) : { records: [] };
   const incomingRecords = normalizeRecords(fetched.records, settings.teamName);
   const incomingMeets = normalizeMeets(fetched.upcomingMeets || [], settings.teamName);
+  const hasFreshMeetSnapshot = fetched.upcomingMeetsStatus === "ok";
   const archivedRecords = mergeRecordArchive(previousState.recentResults || [], incomingRecords);
   const bestRecords = buildBestRecords(archivedRecords);
   const updateHistory = mergeHistory(previousState, incomingRecords);
@@ -85,7 +86,9 @@ export async function syncRecords(previousState) {
     ...previousState,
     recentResults: archivedRecords,
     bestRecords,
-    upcomingMeets: incomingMeets.length ? incomingMeets : keepFutureMeets(previousState.upcomingMeets || []),
+    upcomingMeets: hasFreshMeetSnapshot
+      ? incomingMeets
+      : incomingMeets.length ? incomingMeets : keepFutureMeets(previousState.upcomingMeets || []),
     updateHistory,
     lastSyncedAt: new Date().toISOString()
   };

@@ -16,9 +16,9 @@ import { getStoredState, saveStoredState, syncRecords } from "./recordSync";
 import { bestQualification, evaluateRecordQualification, loadQualificationStandards, qualificationEvent } from "./qualification";
 
 const tabs = [
+  { id: "meets", label: "大会一覧", icon: CalendarDays },
   { id: "members", label: "メンバー", icon: UsersRound },
-  { id: "times", label: "種目", icon: Timer },
-  { id: "meets", label: "大会一覧", icon: CalendarDays }
+  { id: "times", label: "種目", icon: Timer }
 ];
 const CARD_CROP_ASPECT = 1;
 const NAME_READING_PARTS = [
@@ -27,7 +27,7 @@ const NAME_READING_PARTS = [
 ];
 
 function App() {
-  const [activeTab, setActiveTab] = useState("members");
+  const [activeTab, setActiveTab] = useState("meets");
   const [state, setState] = useState(() => getStoredState());
   const [query, setQuery] = useState("");
   const [error, setError] = useState("");
@@ -469,6 +469,9 @@ function App() {
             "--swipe-offset": `${swipeVisual.offset}px`
           }}
         >
+          <section className={`swipePane ${activeTab === "meets" ? "activePane" : ""}`} aria-hidden={activeTab !== "meets"}>
+            <MeetsView records={filteredRecords} upcomingMeets={state.upcomingMeets || []} memberBirthdates={state.memberBirthdates || {}} memberReadings={state.memberReadings || {}} query={query} />
+          </section>
           <section className={`swipePane ${activeTab === "members" ? "activePane" : ""}`} aria-hidden={activeTab !== "members"}>
             <MembersView
               records={filteredRecords}
@@ -494,9 +497,6 @@ function App() {
               onReadingUpdate={handleReadingUpdate}
               onBirthdateUpdate={handleBirthdateUpdate}
             />
-          </section>
-          <section className={`swipePane ${activeTab === "meets" ? "activePane" : ""}`} aria-hidden={activeTab !== "meets"}>
-            <MeetsView records={filteredRecords} upcomingMeets={state.upcomingMeets || []} memberBirthdates={state.memberBirthdates || {}} memberReadings={state.memberReadings || {}} query={query} />
           </section>
         </div>
       </div>
@@ -749,7 +749,7 @@ function MemberCard({ member, onClick, onArchive, onPhotoRequest, onReadingReque
           <h2>{member.name}</h2>
           <div className="memberFacts">
             <span className={`factChip ${genderClassName(member.gender)}`}>{member.gender || "性別未取得"}</span>
-            <span className="factChip ageChip">{member.age !== "" ? `${member.age}歳` : "生年月日未設定"}</span>
+            <span className="factChip ageChip">{member.age !== "" ? `${member.age}歳` : "未設定"}</span>
             <span className="factChip classChip">{member.swimClass || "級未判定"}</span>
           </div>
         </div>
@@ -829,7 +829,7 @@ function MemberModal({ member, isArchived = false, onArchiveToggle, onPhotoUpdat
             <div className="memberTitleBlock">
               <div className="memberNameLine">
                 <h2>{member.name}</h2>
-                <span>{member.gender || "性別未取得"} / {member.birthdate ? `${formatBirthdate(member.birthdate)}（${member.age}歳）` : "生年月日未設定"} / {member.swimClass || "級未判定"}</span>
+                <span>{member.gender || "性別未取得"} / {member.birthdate ? `${formatBirthdate(member.birthdate)}（${member.age}歳）` : "未設定"} / {member.swimClass || "級未判定"}</span>
               </div>
             </div>
             <div className="modalActions">
@@ -1152,6 +1152,39 @@ function MeetModal({ meet, records, memberBirthdates, memberReadings, onClose })
   if (meet.status === "upcoming") {
     return <UpcomingMeetModal meet={meet} records={records} memberBirthdates={memberBirthdates} memberReadings={memberReadings} onClose={onClose} />;
   }
+  return <PastMeetModal meet={meet} records={records} memberBirthdates={memberBirthdates} memberReadings={memberReadings} onClose={onClose} />;
+}
+
+function PastMeetModal({ meet, records, memberBirthdates, memberReadings, onClose }) {
+  const [genderFilters, setGenderFilters] = useState([]);
+  const [ageFilter, setAgeFilter] = useState("all");
+  const [classFilter, setClassFilter] = useState("all");
+  const [eventFilter, setEventFilter] = useState("all");
+  const emptyPhotos = useMemo(() => ({}), []);
+  const members = useQualifiedMembers(records, emptyPhotos, memberReadings, memberBirthdates);
+  const memberByName = useMemo(() => new Map(members.map((member) => [member.name, member])), [members]);
+  const meetRecords = useMemo(() => meet.records.map((record) => {
+    const member = memberByName.get(record.swimmer);
+    return {
+      ...record,
+      gender: record.gender || getGender(record.event) || member?.gender || "",
+      age: member?.age || calculateAge(memberBirthdates[record.swimmer]) || "",
+      swimClass: member?.swimClass || ""
+    };
+  }), [meet.records, memberByName, memberBirthdates]);
+  const options = useMemo(() => ({
+    ages: Array.from(new Set(meetRecords.map((record) => record.age).filter((value) => value !== ""))).sort((a, b) => a - b),
+    classes: Array.from(new Set(meetRecords.map((record) => record.swimClass).filter(Boolean))).sort(compareSwimClass),
+    events: Array.from(new Set(meetRecords.map((record) => record.event).filter(Boolean))).sort((a, b) => a.localeCompare(b, "ja"))
+  }), [meetRecords]);
+  const filteredRecords = meetRecords.filter((record) => {
+    if (genderFilters.length && !genderFilters.includes(record.gender)) return false;
+    if (ageFilter !== "all" && String(record.age) !== ageFilter) return false;
+    if (classFilter !== "all" && record.swimClass !== classFilter) return false;
+    if (eventFilter !== "all" && record.event !== eventFilter) return false;
+    return true;
+  });
+
   return (
     <div className="modalBackdrop" role="presentation" onMouseDown={onClose}>
       <section className="settingsModal meetModal" role="dialog" aria-modal="true" aria-label={`${meet.name}の記録`} onMouseDown={(event) => event.stopPropagation()}>
@@ -1163,12 +1196,46 @@ function MeetModal({ meet, records, memberBirthdates, memberReadings, onClose })
           </div>
           <button className="iconButton closeButton" onClick={onClose} aria-label="閉じる">×</button>
         </header>
+        <section className="pastMeetFilters" aria-label="大会記録の絞り込み">
+          <div className="genderToggle pastMeetGender" aria-label="性別">
+            {["男子", "女子"].map((gender) => (
+              <button
+                key={gender}
+                className={genderFilters.includes(gender) ? "active" : ""}
+                onClick={() => setGenderFilters((current) => current.includes(gender) ? current.filter((value) => value !== gender) : [...current, gender])}
+              >
+                {gender === "男子" ? "男" : "女"}
+              </button>
+            ))}
+          </div>
+          <label>
+            <span>年齢</span>
+            <select value={ageFilter} onChange={(event) => setAgeFilter(event.target.value)}>
+              <option value="all">すべて</option>
+              {options.ages.map((age) => <option key={age} value={age}>{age}歳</option>)}
+            </select>
+          </label>
+          <label>
+            <span>級</span>
+            <select value={classFilter} onChange={(event) => setClassFilter(event.target.value)}>
+              <option value="all">すべて</option>
+              {options.classes.map((swimClass) => <option key={swimClass} value={swimClass}>{swimClass}</option>)}
+            </select>
+          </label>
+          <label className="pastMeetEventFilter">
+            <span>種目</span>
+            <select value={eventFilter} onChange={(event) => setEventFilter(event.target.value)}>
+              <option value="all">すべて</option>
+              {options.events.map((eventName) => <option key={eventName} value={eventName}>{eventName}</option>)}
+            </select>
+          </label>
+        </section>
           <section className="recordHistory meetRecords">
-            {meet.records.map((record) => (
+            {filteredRecords.map((record) => (
               <article className="meetRecordRow" key={record.id}>
                 <div className="meetRecordName">
                   <strong>{record.swimmer}</strong>
-                  <span>{memberBirthdates[record.swimmer] ? `${calculateAge(memberBirthdates[record.swimmer])}歳` : "-"}</span>
+                  <span>{[record.age !== "" ? `${record.age}歳` : "", record.swimClass].filter(Boolean).join(" / ") || "-"}</span>
                 </div>
                 <div className="meetRecordEvent">
                   <span>{record.event}</span>
@@ -1180,6 +1247,7 @@ function MeetModal({ meet, records, memberBirthdates, memberReadings, onClose })
               </article>
             ))}
           </section>
+          {!filteredRecords.length ? <EmptyState title="該当する記録がありません" text="絞り込み条件を変更してください。" /> : null}
       </section>
     </div>
   );
@@ -1286,7 +1354,7 @@ function SettingsModal({ records, archivedMembers, memberPhotos, memberReadings,
                 <article className="archiveRow" key={member.name}>
                   <button onClick={() => setSelectedMember(member)}>
                     <strong>{member.name}</strong>
-                    <span>{member.gender || "性別未取得"} / {member.birthdate ? `${formatBirthdate(member.birthdate)}（${member.age}歳）` : "生年月日未設定"} / {member.swimClass || "級未判定"}</span>
+                    <span>{member.gender || "性別未取得"} / {member.birthdate ? `${formatBirthdate(member.birthdate)}（${member.age}歳）` : "未設定"} / {member.swimClass || "級未判定"}</span>
                   </button>
                   <button className="restoreButton" onClick={() => onArchiveToggle(member.name)}>戻す</button>
                 </article>

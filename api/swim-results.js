@@ -3,7 +3,9 @@ const PLAYER_SEARCH_URL = "https://result.swim.or.jp/player-search";
 const TEAM_NAME = "RSケーニーズ";
 const TEAM_SEARCH_TERM = "ケーニーズ";
 const TEAM_CODE = "22285";
+const MEMBER_GROUP_CODE = 22;
 const PERIOD_CODE = 3;
+const ENTRY_COMPLETED_STATUS = 2;
 
 export default async function handler(request, response) {
   if (request.method !== "GET") {
@@ -21,6 +23,12 @@ export default async function handler(request, response) {
       gender_code: 99
     });
     const members = (rosterPayload?.data || []).filter((member) => String(member?.entry_group?.code || "") === TEAM_CODE);
+    let upcomingMeetSyncFailed = false;
+    const upcomingMeetsPromise = fetchUpcomingMeets().catch((error) => {
+      upcomingMeetSyncFailed = true;
+      console.warn("Upcoming meet fetch failed", error.message);
+      return [];
+    });
 
     const membersWithEntries = await mapLimit(members, 12, async (member) => {
       const athleteId = encodeAthleteCode(member.swimmer_code);
@@ -50,16 +58,20 @@ export default async function handler(request, response) {
     });
 
     const records = dedupeRecords(resultGroups.flat()).sort((a, b) => b.date.localeCompare(a.date));
+    const upcomingMeets = await upcomingMeetsPromise;
     response.setHeader("Cache-Control", "s-maxage=300, stale-while-revalidate=900");
     response.status(200).json({
       records,
-      upcomingMeets: [],
+      upcomingMeets,
+      upcomingMeetsStatus: upcomingMeetSyncFailed ? "error" : "ok",
       members: members.map(normalizeMember),
-      sourceStatus: failedJobs ? "partial" : "ok",
+      sourceStatus: failedJobs || upcomingMeetSyncFailed ? "partial" : "ok",
       diagnostics: {
         memberCount: members.length,
         recordCount: records.length,
-        failedRecordRequests: failedJobs
+        failedRecordRequests: failedJobs,
+        upcomingMeetCount: upcomingMeets.length,
+        failedUpcomingMeetRequests: upcomingMeetSyncFailed ? 1 : 0
       },
       checkedAt: new Date().toISOString()
     });
@@ -71,6 +83,106 @@ export default async function handler(request, response) {
       upcomingMeets: []
     });
   }
+}
+
+async function fetchUpcomingMeets() {
+  const games = await fetchEntryCompletedGames(currentCompetitionYear());
+  const meets = await mapLimit(games, 4, async (game) => {
+    const gameCode = String(game?.game_code || "");
+    if (!gameCode) return null;
+
+    const groupsPayload = await fetchOfficialJson(`/games/${encodeURIComponent(gameCode)}/entry_groups`, {
+      keyword: TEAM_SEARCH_TERM
+    });
+    const team = (groupsPayload?.result || []).find((group) => String(group?.entry_group_code || "") === TEAM_CODE);
+    if (!team) return null;
+
+    const teamName = team.entry_group_name || TEAM_NAME;
+    const detail = await fetchOfficialJson(
+      `/games/${encodeURIComponent(gameCode)}/entry_groups/${encodeURIComponent(TEAM_CODE)}/${encodeURIComponent(teamName)}`
+    );
+    const entries = normalizeUpcomingEntries(detail?.results || [], game);
+    if (!entries.length) return null;
+
+    return {
+      id: `result-swim-game-${gameCode}`,
+      date: normalizeDate(game.start_date),
+      endDate: normalizeDate(game.end_date || game.start_date),
+      name: String(game.game_name || "").replace(/^[^：:]+[：:]/, ""),
+      place: game.pool || "",
+      team: TEAM_NAME,
+      status: "upcoming",
+      sourceUrl: `https://result.swim.or.jp/tournament/${encodeURIComponent(gameCode)}`,
+      entries
+    };
+  });
+
+  return meets.filter(Boolean).sort((a, b) => a.date.localeCompare(b.date));
+}
+
+async function fetchEntryCompletedGames(year) {
+  const games = [];
+  let page = 1;
+  let lastPage = 1;
+  do {
+    const payload = await fetchOfficialJson("/games", {
+      year,
+      member_group_code: MEMBER_GROUP_CODE,
+      game_status: ENTRY_COMPLETED_STATUS,
+      page,
+      sort_order: "ascend",
+      official_code: 3
+    });
+    games.push(...(payload?.data || []));
+    lastPage = Math.max(1, Number(payload?.meta?.last_page) || 1);
+    page += 1;
+  } while (page <= lastPage && page <= 10);
+  return games;
+}
+
+function normalizeUpcomingEntries(groups, game) {
+  const entries = [];
+  for (const group of groups) {
+    const gender = group?.gender?.name || "";
+    const event = [
+      gender,
+      group?.class?.name || "",
+      group?.distance?.name || "",
+      group?.swimming_style?.name || "",
+      group?.race_division?.name || "",
+      game?.waterway?.name ? `(${game.waterway.name})` : ""
+    ].filter(Boolean).join(" ");
+
+    for (const record of group?.records || []) {
+      const swimmer = record?.swimmers || {};
+      const swimmerName = swimmer.swimmer_name || "";
+      if (!swimmerName) continue;
+      entries.push({
+        id: [game?.game_code, swimmer.swimmer_code, group?.distance?.code, group?.swimming_style?.code, group?.race_division?.code].filter(Boolean).join("-"),
+        memberCode: String(swimmer.swimmer_code || ""),
+        swimmer: swimmerName,
+        gender,
+        grade: formatSchoolGrade(swimmer.school_class),
+        event,
+        entryTime: record.entry_time || "",
+        team: TEAM_NAME
+      });
+    }
+  }
+  return dedupeUpcomingEntries(entries);
+}
+
+function dedupeUpcomingEntries(entries) {
+  const byKey = new Map();
+  entries.forEach((entry) => {
+    const key = [entry.memberCode, entry.event].join("|");
+    byKey.set(key, entry);
+  });
+  return Array.from(byKey.values());
+}
+
+function currentCompetitionYear(date = new Date()) {
+  return date.getMonth() >= 3 ? date.getFullYear() : date.getFullYear() - 1;
 }
 
 function buildRecordJobs(membersWithEntries) {
