@@ -57,9 +57,10 @@ export default async function handler(request, response) {
       }
     });
 
-    const records = (await enrichRecordsWithResultDetails(dedupeRecords(resultGroups.flat()))).sort((a, b) => b.date.localeCompare(a.date));
+    const rankEnrichment = await enrichRecordsWithResultDetails(dedupeRecords(resultGroups.flat()));
+    const records = rankEnrichment.records.sort((a, b) => b.date.localeCompare(a.date));
     const upcomingMeets = await upcomingMeetsPromise;
-    response.setHeader("Cache-Control", "s-maxage=300, stale-while-revalidate=900");
+    response.setHeader("Cache-Control", "no-store, max-age=0");
     response.status(200).json({
       records,
       upcomingMeets,
@@ -69,6 +70,9 @@ export default async function handler(request, response) {
       diagnostics: {
         memberCount: members.length,
         recordCount: records.length,
+        rankedRecordCount: records.filter((record) => Boolean(record.rank)).length,
+        rankDetailRequests: rankEnrichment.requested,
+        failedRankDetailRequests: rankEnrichment.failed,
         failedRecordRequests: failedJobs,
         upcomingMeetCount: upcomingMeets.length,
         failedUpcomingMeetRequests: upcomingMeetSyncFailed ? 1 : 0
@@ -236,11 +240,18 @@ function normalizeOfficialRecords(payload, job, cutoff) {
 }
 
 async function enrichRecordsWithResultDetails(records) {
-  return mapLimit(records, 12, async (record) => {
-    if (!record.resultId || record.rank) return record;
+  let requested = 0;
+  let failed = 0;
+  const enrichedRecords = await mapLimit(records, 10, async (record) => {
+    if (!record.resultId) return record;
+
+    requested += 1;
 
     const detail = await fetchResultDetail(record.resultId);
-    if (!detail) return record;
+    if (!detail) {
+      failed += 1;
+      return record;
+    }
 
     return {
       ...record,
@@ -253,6 +264,8 @@ async function enrichRecordsWithResultDetails(records) {
       time: detail.result_time || record.time
     };
   });
+
+  return { records: enrichedRecords, requested, failed };
 }
 
 async function fetchResultDetail(resultId) {

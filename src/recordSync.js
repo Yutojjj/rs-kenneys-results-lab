@@ -99,8 +99,15 @@ async function fetchViaProxy(settings) {
   url.searchParams.set("source", settings.sourceUrl);
   url.searchParams.set("team", settings.teamName);
   url.searchParams.set("months", String(settings.syncMonths || 12));
+  url.searchParams.set("refresh", String(Date.now()));
 
-  const response = await fetch(url.toString(), { headers: { Accept: "application/json" } });
+  const response = await fetch(url.toString(), {
+    cache: "no-store",
+    headers: {
+      Accept: "application/json",
+      "Cache-Control": "no-cache"
+    }
+  });
   if (!response.ok) {
     throw new Error("記録の取得に失敗しました。プロキシ/APIの状態を確認してください。");
   }
