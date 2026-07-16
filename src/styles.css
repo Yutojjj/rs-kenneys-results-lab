@@ -195,6 +195,10 @@ h1 {
   backdrop-filter: blur(10px);
 }
 
+.app.tab-members .controls {
+  bottom: calc(env(safe-area-inset-bottom) + 8px + var(--keyboard-offset, 0px));
+}
+
 .searchBox {
   min-height: 42px;
   flex: 1;
@@ -861,45 +865,76 @@ h1 {
   color: #15803d;
 }
 
-.memberLongPressMenu {
-  position: absolute;
-  left: 4px;
-  right: 4px;
-  top: 50%;
-  z-index: 20;
+.actionSheetBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 45;
   display: grid;
-  gap: 6px;
-  padding: 8px;
-  border: 1px solid rgba(15, 118, 110, 0.2);
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.97);
-  box-shadow: 0 16px 30px rgba(11, 45, 42, 0.18);
-  transform: translateY(-50%);
+  align-items: end;
+  padding: 16px 12px calc(env(safe-area-inset-bottom) + 14px);
+  background: rgba(8, 22, 21, 0.48);
 }
 
-.memberLongPressMenu button {
-  min-height: 34px;
+.memberActionSheet {
+  width: min(430px, 100%);
+  justify-self: center;
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 24px 55px rgba(8, 22, 21, 0.28);
+}
+
+.memberActionSheet header {
+  display: grid;
+  gap: 1px;
+  padding: 2px 6px 6px;
+}
+
+.memberActionSheet header small {
+  color: #64748b;
+  font-size: 11px;
+}
+
+.memberActionSheet header strong {
+  color: #102322;
+  font-size: 17px;
+}
+
+.memberActionSheet button {
+  min-height: 46px;
   border: 0;
-  border-radius: 8px;
+  border-radius: 10px;
   background: #eef7f5;
   color: #0b4f49;
-  font-size: 11px;
+  font-size: 14px;
   font-weight: 900;
 }
 
-.memberLongPressMenu .photoMenuAction {
+.memberActionSheet .photoMenuAction {
   color: #0f766e;
   background: #dff8f4;
 }
 
-.memberLongPressMenu .archiveMenuAction {
+.memberActionSheet .birthdateMenuAction {
+  color: #0f5f8a;
+  background: #e2f2ff;
+}
+
+.memberActionSheet .archiveMenuAction {
   background: #fff3e0;
   color: #8a4a00;
 }
 
-.memberLongPressMenu .readingMenuAction {
+.memberActionSheet .readingMenuAction {
   color: #6d28d9;
   background: #f1eaff;
+}
+
+.memberActionSheet .cancelMenuAction {
+  color: #38514e;
+  background: #edf5f3;
 }
 
 .timeCard p {

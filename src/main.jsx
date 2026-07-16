@@ -552,6 +552,8 @@ function MembersView({ records, archivedMembers, memberPhotos, memberReadings, m
   const [selectedMember, setSelectedMember] = useState(null);
   const [uploadMember, setUploadMember] = useState(null);
   const [readingMember, setReadingMember] = useState(null);
+  const [birthdateMember, setBirthdateMember] = useState(null);
+  const [actionMember, setActionMember] = useState(null);
   const [genderFilters, setGenderFilters] = useState([]);
   const [ageFilter, setAgeFilter] = useState("all");
   const [classFilter, setClassFilter] = useState("all");
@@ -645,9 +647,7 @@ function MembersView({ records, archivedMembers, memberPhotos, memberReadings, m
             key={member.name}
             member={member}
             onClick={() => handleOpenMember(member)}
-            onArchive={() => onArchiveToggle(member.name)}
-            onPhotoRequest={() => setUploadMember(member)}
-            onReadingRequest={() => setReadingMember(member)}
+            onActionRequest={() => setActionMember(member)}
           />
         ))}
       </section>
@@ -685,12 +685,40 @@ function MembersView({ records, archivedMembers, memberPhotos, memberReadings, m
           onClose={() => setReadingMember(null)}
         />
       ) : null}
+      {birthdateMember ? (
+        <BirthdateEditModal
+          member={birthdateMember}
+          onBirthdateUpdate={onBirthdateUpdate}
+          onClose={() => setBirthdateMember(null)}
+        />
+      ) : null}
+      {actionMember ? (
+        <MemberActionSheet
+          member={actionMember}
+          onPhotoRequest={() => {
+            setUploadMember(actionMember);
+            setActionMember(null);
+          }}
+          onArchive={() => {
+            onArchiveToggle(actionMember.name);
+            setActionMember(null);
+          }}
+          onReadingRequest={() => {
+            setReadingMember(actionMember);
+            setActionMember(null);
+          }}
+          onBirthdateRequest={() => {
+            setBirthdateMember(actionMember);
+            setActionMember(null);
+          }}
+          onClose={() => setActionMember(null)}
+        />
+      ) : null}
     </>
   );
 }
 
-function MemberCard({ member, onClick, onArchive, onPhotoRequest, onReadingRequest }) {
-  const [menuOpen, setMenuOpen] = useState(false);
+function MemberCard({ member, onClick, onActionRequest }) {
   const longPressTimer = useRef(null);
   const longPressTriggered = useRef(false);
 
@@ -703,7 +731,7 @@ function MemberCard({ member, onClick, onArchive, onPhotoRequest, onReadingReque
 
   function openMenu() {
     longPressTriggered.current = true;
-    setMenuOpen(true);
+    onActionRequest();
   }
 
   function handlePointerDown() {
@@ -717,7 +745,7 @@ function MemberCard({ member, onClick, onArchive, onPhotoRequest, onReadingReque
   }
 
   function handleClick(event) {
-    if (longPressTriggered.current || menuOpen) {
+    if (longPressTriggered.current) {
       event.preventDefault();
       longPressTriggered.current = false;
       return;
@@ -752,41 +780,24 @@ function MemberCard({ member, onClick, onArchive, onPhotoRequest, onReadingReque
           </div>
         </div>
       </button>
-      {menuOpen ? (
-        <div className="memberLongPressMenu" role="menu">
-          <button
-            type="button"
-            className="photoMenuAction"
-            onClick={() => {
-              onPhotoRequest();
-              setMenuOpen(false);
-            }}
-          >
-            画像アップロード
-          </button>
-          <button
-            type="button"
-            className="archiveMenuAction"
-            onClick={() => {
-              onArchive();
-              setMenuOpen(false);
-            }}
-          >
-            アーカイブ（表示しない）
-          </button>
-          <button
-            type="button"
-            className="readingMenuAction"
-            onClick={() => {
-              onReadingRequest();
-              setMenuOpen(false);
-            }}
-          >
-            かな入力
-          </button>
-          <button type="button" onClick={() => setMenuOpen(false)}>キャンセル</button>
-        </div>
-      ) : null}
+    </div>
+  );
+}
+
+function MemberActionSheet({ member, onPhotoRequest, onArchive, onReadingRequest, onBirthdateRequest, onClose }) {
+  return (
+    <div className="actionSheetBackdrop" role="presentation" onMouseDown={onClose}>
+      <section className="memberActionSheet" role="dialog" aria-modal="true" aria-label={`${member.name}の操作`} onMouseDown={(event) => event.stopPropagation()}>
+        <header>
+          <small>{member.reading || "メンバー操作"}</small>
+          <strong>{member.name}</strong>
+        </header>
+        <button type="button" className="photoMenuAction" onClick={onPhotoRequest}>画像アップロード</button>
+        <button type="button" className="birthdateMenuAction" onClick={onBirthdateRequest}>生年月日入力</button>
+        <button type="button" className="readingMenuAction" onClick={onReadingRequest}>かな入力</button>
+        <button type="button" className="archiveMenuAction" onClick={onArchive}>アーカイブ（表示しない）</button>
+        <button type="button" className="cancelMenuAction" onClick={onClose}>キャンセル</button>
+      </section>
     </div>
   );
 }
