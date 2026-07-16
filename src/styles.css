@@ -1905,6 +1905,10 @@ h1 {
   gap: 6px;
 }
 
+.pastMeetResultGrid {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .upcomingEntryCard,
 .pastMeetResultCard {
   display: grid;
@@ -2031,12 +2035,23 @@ h1 {
     gap: 5px;
   }
 
+  .pastMeetResultGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .upcomingEntryCard,
   .pastMeetResultCard {
     grid-template-columns: minmax(0, 1fr);
     align-content: space-between;
     min-height: 92px;
     padding: 7px;
+  }
+
+  .pastMeetResultCard {
+    grid-template-columns: minmax(0, 1fr) max-content;
+    align-content: center;
+    min-height: 68px;
+    padding: 7px 9px;
   }
 
   .upcomingBestTime {
@@ -2053,7 +2068,7 @@ h1 {
   }
 
   .pastMeetResultTimes {
-    justify-items: start;
+    justify-items: end;
   }
 
   .pastMeetResultTimes strong {
