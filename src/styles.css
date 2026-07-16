@@ -1548,23 +1548,6 @@ h1 {
   white-space: nowrap;
 }
 
-.eventBestCard .bestBadge {
-  position: static;
-  grid-column: 2;
-  grid-row: 1;
-  justify-self: end;
-  display: inline-flex;
-  align-items: center;
-  min-height: 22px;
-  padding: 0 7px;
-  border-radius: 999px;
-  color: #7a4f00;
-  background: #fde68a;
-  font-size: 10px;
-  font-weight: 900;
-  letter-spacing: 0;
-}
-
 .qualificationBadge {
   grid-column: 2;
   grid-row: 2;
