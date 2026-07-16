@@ -1118,7 +1118,7 @@ function MeetsView({ records, allRecords, upcomingMeets, archivedMembers, member
   const meets = mode === "upcoming" ? futureMeets : pastMeets;
 
   return (
-    <>
+    <section className={`meetsView ${mode === "history" ? "historyMode" : ""}`}>
       <section className="meetModeTabs" aria-label="大会の開催状況">
         <button className={mode === "upcoming" ? "active" : ""} onClick={() => setMode("upcoming")}>開催予定</button>
         <button className={mode === "past" ? "active" : ""} onClick={() => setMode("past")}>大会結果</button>
@@ -1174,7 +1174,7 @@ function MeetsView({ records, allRecords, upcomingMeets, archivedMembers, member
           onClose={() => setSelectedMeet(null)}
         />
       ) : null}
-    </>
+    </section>
   );
 }
 

@@ -1018,6 +1018,10 @@ h1 {
   box-shadow: 0 4px 12px rgba(15, 118, 110, 0.22);
 }
 
+.meetsView.historyMode .eventFilterBar {
+  bottom: calc(var(--control-dock-height) + var(--tab-height) + env(safe-area-inset-bottom) + 18px + var(--keyboard-offset, 0px));
+}
+
 .meetCard {
   display: flex;
   justify-content: space-between;
