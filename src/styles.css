@@ -1588,19 +1588,16 @@ h1 {
 .rankFirst {
   color: #7a4600;
   background: #ffe38a;
-  box-shadow: inset 3px 0 #d89b00;
 }
 
 .rankSecond {
   color: #45545d;
   background: #e5ecef;
-  box-shadow: inset 3px 0 #91a1a9;
 }
 
 .rankThird {
   color: #8a3f08;
   background: #ffe2ca;
-  box-shadow: inset 3px 0 #c46b2d;
 }
 
 .qualificationBadge {
