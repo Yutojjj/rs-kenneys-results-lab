@@ -177,7 +177,7 @@ h1 {
   position: fixed;
   left: 50%;
   top: auto;
-  bottom: calc(env(safe-area-inset-bottom) + 8px + var(--keyboard-offset, 0px));
+  bottom: calc(var(--tab-height) + env(safe-area-inset-bottom) + 16px + var(--keyboard-offset, 0px));
   z-index: 17;
   width: var(--dock-width);
   display: flex;
@@ -985,7 +985,7 @@ h1 {
   position: fixed;
   left: 50%;
   top: auto;
-  bottom: calc(var(--control-dock-height) + env(safe-area-inset-bottom) + 8px + var(--keyboard-offset, 0px));
+  bottom: calc(env(safe-area-inset-bottom) + 8px + var(--keyboard-offset, 0px));
   z-index: 16;
   width: var(--dock-width);
   display: grid;
@@ -1019,7 +1019,7 @@ h1 {
 }
 
 .meetsView.historyMode .eventFilterBar {
-  bottom: calc(var(--control-dock-height) + var(--tab-height) + env(safe-area-inset-bottom) + 18px + var(--keyboard-offset, 0px));
+  bottom: calc(var(--control-dock-height) + var(--tab-height) + env(safe-area-inset-bottom) + 24px + var(--keyboard-offset, 0px));
 }
 
 .meetCard {
