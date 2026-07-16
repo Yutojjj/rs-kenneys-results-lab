@@ -15,8 +15,8 @@ import { getStoredState, saveStoredState, syncRecordRanks, syncRecords } from ".
 import { bestQualification, evaluateRecordQualification, loadQualificationStandards, qualificationEvent } from "./qualification";
 
 const tabs = [
-  { id: "meets", label: "大会一覧", icon: CalendarDays },
-  { id: "members", label: "メンバー", icon: UsersRound }
+  { id: "meets", label: "ホーム", icon: CalendarDays },
+  { id: "members", label: "選手", icon: UsersRound }
 ];
 const CARD_CROP_ASPECT = 1;
 const NAME_READING_PARTS = [
@@ -32,18 +32,11 @@ function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [isDockHidden, setIsDockHidden] = useState(false);
   const [keyboardOffset, setKeyboardOffset] = useState(0);
-  const [swipeVisual, setSwipeVisual] = useState({ offset: 0, animating: false });
-  const swipeSurfaceRef = useRef(null);
-  const swipeTrackRef = useRef(null);
-  const tabsRef = useRef(null);
-  const swipeStartRef = useRef(null);
-  const swipeFrameRef = useRef(0);
   const queryReadyRef = useRef(false);
   const searchFocusedRef = useRef(false);
   const searchScrollTimersRef = useRef([]);
   const stateRef = useRef(state);
   const syncInFlightRef = useRef(null);
-  const activeTabIndex = Math.max(0, tabs.findIndex((tab) => tab.id === activeTab));
 
   function resetSearchScroll() {
     window.scrollTo({ top: 0, left: 0, behavior: "auto" });
@@ -137,80 +130,9 @@ function App() {
     });
   }
 
-  function moveActiveTab(direction) {
-    const currentIndex = activeTabIndex;
-    const nextIndex = clamp(currentIndex + direction, 0, tabs.length - 1);
-    if (nextIndex !== currentIndex) setActiveTab(tabs[nextIndex].id);
-  }
-
   function selectTab(tabId) {
-    const nextIndex = tabs.findIndex((tab) => tab.id === tabId);
-    if (nextIndex < 0 || tabId === activeTab) return;
-    setSwipeVisual({ offset: 0, animating: true });
+    if (!tabs.some((tab) => tab.id === tabId) || tabId === activeTab) return;
     setActiveTab(tabId);
-    window.setTimeout(() => setSwipeVisual({ offset: 0, animating: false }), 240);
-  }
-
-  function setSwipeOffset(offset, animating = false) {
-    if (swipeFrameRef.current) window.cancelAnimationFrame(swipeFrameRef.current);
-    swipeFrameRef.current = window.requestAnimationFrame(() => {
-      const track = swipeTrackRef.current;
-      const surface = swipeSurfaceRef.current;
-      const tabBar = tabsRef.current;
-      if (track) {
-        track.style.setProperty("--swipe-offset", `${offset}px`);
-        track.classList.toggle("swipeAnimating", animating);
-      }
-      if (tabBar) {
-        tabBar.style.setProperty("--tab-swipe-offset", `${-offset / 3}px`);
-        tabBar.classList.toggle("tabAnimating", animating);
-      }
-      surface?.classList.toggle("swipeDragging", Math.abs(offset) > 0.5);
-      swipeFrameRef.current = 0;
-    });
-  }
-
-  function snapSwipeBack() {
-    setSwipeOffset(0, true);
-    window.setTimeout(() => {
-      swipeTrackRef.current?.classList.remove("swipeAnimating");
-      swipeSurfaceRef.current?.classList.remove("swipeDragging");
-      tabsRef.current?.classList.remove("tabAnimating");
-    }, 220);
-  }
-
-  function animateTabSwipe(direction) {
-    const currentIndex = activeTabIndex;
-    const nextIndex = clamp(currentIndex + direction, 0, tabs.length - 1);
-    if (nextIndex === currentIndex) {
-      snapSwipeBack();
-      return;
-    }
-    if (swipeFrameRef.current) {
-      window.cancelAnimationFrame(swipeFrameRef.current);
-      swipeFrameRef.current = 0;
-    }
-    const track = swipeTrackRef.current;
-    if (track) {
-      track.classList.add("swipeAnimating");
-      track.style.setProperty("--swipe-offset", "0px");
-    }
-    if (tabsRef.current) {
-      tabsRef.current.classList.add("tabAnimating");
-      tabsRef.current.style.setProperty("--tab-swipe-offset", "0px");
-    }
-    setSwipeVisual({ offset: 0, animating: true });
-    setActiveTab(tabs[nextIndex].id);
-    window.setTimeout(() => {
-      setSwipeVisual({ offset: 0, animating: false });
-      swipeTrackRef.current?.classList.remove("swipeAnimating");
-      swipeSurfaceRef.current?.classList.remove("swipeDragging");
-      tabsRef.current?.classList.remove("tabAnimating");
-    }, 240);
-  }
-
-  function shouldIgnoreSwipe(target) {
-    return Boolean(target.closest("input,select,textarea,a,.tabs,.controls,.memberFilterBar,.eventFilterBar,.meetModeTabs,.modalBackdrop,.memberLongPressMenu"));
   }
 
   useEffect(() => {
@@ -321,89 +243,6 @@ function App() {
     };
   }, []);
 
-  useEffect(() => {
-    const gestureArea = document;
-    const surface = swipeSurfaceRef.current;
-    if (!gestureArea || !surface) return undefined;
-
-    function touchStart(event) {
-      if (!event.touches.length || shouldIgnoreSwipe(event.target)) {
-        swipeStartRef.current = null;
-        return;
-      }
-      const touch = event.touches[0];
-      swipeStartRef.current = {
-        x: touch.clientX,
-        y: touch.clientY,
-        time: Date.now(),
-        locked: "",
-        deltaX: 0,
-        dragging: false
-      };
-    }
-
-    function touchMove(event) {
-      const start = swipeStartRef.current;
-      if (!start || !event.touches.length) return;
-      const touch = event.touches[0];
-      const dx = touch.clientX - start.x;
-      const dy = touch.clientY - start.y;
-      if (!start.locked) {
-        const ax = Math.abs(dx);
-        const ay = Math.abs(dy);
-        if (ax < 8 && ay < 8) return;
-        if (ax > ay * 1.2) start.locked = "h";
-        else if (ay > ax * 1.05) start.locked = "v";
-        else return;
-      }
-      if (start.locked !== "h") return;
-      event.preventDefault();
-      const currentIndex = activeTabIndex;
-      const atFirst = currentIndex <= 0 && dx > 0;
-      const atLast = currentIndex >= tabs.length - 1 && dx < 0;
-      const visualOffset = atFirst || atLast ? dx * 0.22 : dx;
-      start.deltaX = visualOffset;
-      start.dragging = true;
-      setSwipeOffset(visualOffset, false);
-    }
-
-    function touchEnd() {
-      const start = swipeStartRef.current;
-      swipeStartRef.current = null;
-      if (!start || !start.dragging) {
-        snapSwipeBack();
-        return;
-      }
-      const elapsed = Math.max(Date.now() - start.time, 1);
-      const width = surface.offsetWidth || window.innerWidth;
-      const threshold = Math.min(width * 0.24, 96);
-      const velocity = Math.abs(start.deltaX) / elapsed;
-      if (start.deltaX < -threshold || (velocity > 0.48 && start.deltaX < -30)) {
-        animateTabSwipe(1);
-      } else if (start.deltaX > threshold || (velocity > 0.48 && start.deltaX > 30)) {
-        animateTabSwipe(-1);
-      } else {
-        snapSwipeBack();
-      }
-    }
-
-    function touchCancel() {
-      swipeStartRef.current = null;
-      snapSwipeBack();
-    }
-
-    gestureArea.addEventListener("touchstart", touchStart, { passive: true });
-    gestureArea.addEventListener("touchmove", touchMove, { passive: false });
-    gestureArea.addEventListener("touchend", touchEnd, { passive: true });
-    gestureArea.addEventListener("touchcancel", touchCancel, { passive: true });
-    return () => {
-      gestureArea.removeEventListener("touchstart", touchStart);
-      gestureArea.removeEventListener("touchmove", touchMove);
-      gestureArea.removeEventListener("touchend", touchEnd);
-      gestureArea.removeEventListener("touchcancel", touchCancel);
-    };
-  }, [activeTab]);
-
   return (
     <main
       className={`app tab-${activeTab} ${isDockHidden ? "dockHidden" : ""}`}
@@ -446,12 +285,7 @@ function App() {
         </button>
       </div>
 
-      <nav
-        ref={tabsRef}
-        className={`tabs ${swipeVisual.animating ? "tabAnimating" : ""}`}
-        style={{ "--active-tab-offset": `${activeTabIndex * 100}%`, "--tab-swipe-offset": "0px" }}
-        aria-label="画面切り替え"
-      >
+      <nav className="tabs" aria-label="画面切り替え">
         {tabs.map((tab) => {
           const TabIcon = tab.icon;
           return (
@@ -463,45 +297,35 @@ function App() {
         })}
       </nav>
 
-      <div className={`swipeSurface ${swipeVisual.offset ? "swipeDragging" : ""}`} ref={swipeSurfaceRef}>
-        <div
-          ref={swipeTrackRef}
-          className={`swipeTrack ${swipeVisual.animating ? "swipeAnimating" : ""}`}
-          style={{
-            "--track-index-offset": `${activeTabIndex * -100}%`,
-            "--swipe-offset": `${swipeVisual.offset}px`
-          }}
-        >
-          <section className={`swipePane ${activeTab === "meets" ? "activePane" : ""}`} aria-hidden={activeTab !== "meets"}>
-            <MeetsView
-              records={filteredRecords}
-              allRecords={state.recentResults}
-              upcomingMeets={state.upcomingMeets || []}
-              archivedMembers={state.archivedMembers || []}
-              memberPhotos={state.memberPhotos || {}}
-              memberBirthdates={state.memberBirthdates || {}}
-              memberReadings={state.memberReadings || {}}
-              onArchiveToggle={handleArchiveToggle}
-              onPhotoUpdate={handlePhotoUpdate}
-              onReadingUpdate={handleReadingUpdate}
-              onBirthdateUpdate={handleBirthdateUpdate}
-              query={query}
-            />
-          </section>
-          <section className={`swipePane ${activeTab === "members" ? "activePane" : ""}`} aria-hidden={activeTab !== "members"}>
-            <MembersView
-              records={filteredRecords}
-              archivedMembers={state.archivedMembers || []}
-              memberPhotos={state.memberPhotos || {}}
-              memberReadings={state.memberReadings || {}}
-              memberBirthdates={state.memberBirthdates || {}}
-              onArchiveToggle={handleArchiveToggle}
-              onPhotoUpdate={handlePhotoUpdate}
-              onReadingUpdate={handleReadingUpdate}
-              onBirthdateUpdate={handleBirthdateUpdate}
-            />
-          </section>
-        </div>
+      <div className="pageSurface">
+        {activeTab === "meets" ? (
+          <MeetsView
+            records={filteredRecords}
+            allRecords={state.recentResults}
+            upcomingMeets={state.upcomingMeets || []}
+            archivedMembers={state.archivedMembers || []}
+            memberPhotos={state.memberPhotos || {}}
+            memberBirthdates={state.memberBirthdates || {}}
+            memberReadings={state.memberReadings || {}}
+            onArchiveToggle={handleArchiveToggle}
+            onPhotoUpdate={handlePhotoUpdate}
+            onReadingUpdate={handleReadingUpdate}
+            onBirthdateUpdate={handleBirthdateUpdate}
+            query={query}
+          />
+        ) : (
+          <MembersView
+            records={filteredRecords}
+            archivedMembers={state.archivedMembers || []}
+            memberPhotos={state.memberPhotos || {}}
+            memberReadings={state.memberReadings || {}}
+            memberBirthdates={state.memberBirthdates || {}}
+            onArchiveToggle={handleArchiveToggle}
+            onPhotoUpdate={handlePhotoUpdate}
+            onReadingUpdate={handleReadingUpdate}
+            onBirthdateUpdate={handleBirthdateUpdate}
+          />
+        )}
       </div>
       {settingsOpen ? (
         <SettingsModal
@@ -1141,18 +965,131 @@ function TimesView({ records, memberPhotos, memberReadings, memberBirthdates, ar
 function MeetsView({ records, allRecords, upcomingMeets, archivedMembers, memberPhotos, memberBirthdates, memberReadings, onArchiveToggle, onPhotoUpdate, onReadingUpdate, onBirthdateUpdate, query }) {
   const [mode, setMode] = useState("upcoming");
   const [selectedMeet, setSelectedMeet] = useState(null);
+  const modeTabsRef = useRef(null);
+  const modeSwipeSurfaceRef = useRef(null);
+  const modeSwipeTrackRef = useRef(null);
+  const modeSwipeStartRef = useRef(null);
+  const modeSwipeFrameRef = useRef(0);
+  const modeSwipeTimerRef = useRef(0);
   const pastMeets = useMemo(() => buildMeetCards(records), [records]);
   const futureMeets = useMemo(() => buildUpcomingMeetCards(upcomingMeets, query), [upcomingMeets, query]);
-  const meets = mode === "upcoming" ? futureMeets : pastMeets;
+  const modeOrder = ["upcoming", "past", "history"];
+  const modeIndex = modeOrder.indexOf(mode);
 
-  return (
-    <section className={`meetsView ${mode === "history" ? "historyMode" : ""}`}>
-      <section className="meetModeTabs" aria-label="大会の開催状況">
-        <button className={mode === "upcoming" ? "active" : ""} onClick={() => setMode("upcoming")}>開催予定</button>
-        <button className={mode === "past" ? "active" : ""} onClick={() => setMode("past")}>大会結果</button>
-        <button className={mode === "history" ? "active" : ""} onClick={() => setMode("history")}>結果一覧</button>
-      </section>
-      {mode === "history" ? (
+  function setModeSwipeOffset(offset, animate = false) {
+    if (modeSwipeFrameRef.current) window.cancelAnimationFrame(modeSwipeFrameRef.current);
+    modeSwipeFrameRef.current = window.requestAnimationFrame(() => {
+      const track = modeSwipeTrackRef.current;
+      const surface = modeSwipeSurfaceRef.current;
+      const tabBar = modeTabsRef.current;
+      if (track) {
+        track.style.setProperty("--swipe-offset", `${offset}px`);
+        track.classList.toggle("swipeAnimating", animate);
+      }
+      if (tabBar) {
+        const width = surface?.offsetWidth || window.innerWidth;
+        tabBar.style.setProperty("--meet-mode-drag-offset", `${(-offset / width) * 100}%`);
+        tabBar.classList.toggle("swipeAnimating", animate);
+      }
+      surface?.classList.toggle("swipeDragging", Math.abs(offset) > 0.5);
+      modeSwipeFrameRef.current = 0;
+    });
+  }
+
+  function finishModeSwipe(nextMode, targetOffset) {
+    window.clearTimeout(modeSwipeTimerRef.current);
+    setModeSwipeOffset(targetOffset, true);
+    modeSwipeTimerRef.current = window.setTimeout(() => {
+      setMode(nextMode);
+      const track = modeSwipeTrackRef.current;
+      if (track) {
+        track.classList.remove("swipeAnimating");
+        track.style.setProperty("--swipe-offset", "0px");
+      }
+      if (modeTabsRef.current) {
+        modeTabsRef.current.classList.remove("swipeAnimating");
+        modeTabsRef.current.style.setProperty("--meet-mode-drag-offset", "0%");
+      }
+      modeSwipeSurfaceRef.current?.classList.remove("swipeDragging");
+    }, 220);
+  }
+
+  function changeMode(nextMode) {
+    const nextIndex = modeOrder.indexOf(nextMode);
+    if (nextIndex < 0 || nextIndex === modeIndex) return;
+    const width = modeSwipeSurfaceRef.current?.offsetWidth || window.innerWidth;
+    finishModeSwipe(nextMode, (modeIndex - nextIndex) * width);
+  }
+
+  function handleModeTouchStart(event) {
+    if (!event.touches.length || event.target.closest("input,select,textarea,a,.meetModeTabs,.modalBackdrop")) {
+      modeSwipeStartRef.current = null;
+      return;
+    }
+    const touch = event.touches[0];
+    modeSwipeStartRef.current = {
+      x: touch.clientX,
+      y: touch.clientY,
+      time: Date.now(),
+      locked: "",
+      deltaX: 0,
+      dragging: false
+    };
+  }
+
+  function handleModeTouchMove(event) {
+    const start = modeSwipeStartRef.current;
+    if (!start || !event.touches.length) return;
+    const touch = event.touches[0];
+    const dx = touch.clientX - start.x;
+    const dy = touch.clientY - start.y;
+    if (!start.locked) {
+      const horizontal = Math.abs(dx);
+      const vertical = Math.abs(dy);
+      if (horizontal < 8 && vertical < 8) return;
+      if (horizontal > vertical * 1.2) start.locked = "horizontal";
+      else if (vertical > horizontal * 1.05) start.locked = "vertical";
+      else return;
+    }
+    if (start.locked !== "horizontal") return;
+    event.preventDefault();
+    const atFirst = modeIndex === 0 && dx > 0;
+    const atLast = modeIndex === modeOrder.length - 1 && dx < 0;
+    const offset = atFirst || atLast ? dx * 0.22 : dx;
+    start.deltaX = offset;
+    start.dragging = true;
+    setModeSwipeOffset(offset);
+  }
+
+  function handleModeTouchEnd(event) {
+    const start = modeSwipeStartRef.current;
+    modeSwipeStartRef.current = null;
+    if (!start?.dragging) {
+      setModeSwipeOffset(0, true);
+      return;
+    }
+    const elapsed = Math.max(Date.now() - start.time, 1);
+    const width = modeSwipeSurfaceRef.current?.offsetWidth || window.innerWidth;
+    const threshold = Math.min(width * 0.24, 96);
+    const velocity = Math.abs(start.deltaX) / elapsed;
+    const direction = start.deltaX < 0 ? 1 : -1;
+    const nextIndex = clamp(modeIndex + direction, 0, modeOrder.length - 1);
+    const shouldChange = Math.abs(start.deltaX) >= threshold || (velocity > 0.48 && Math.abs(start.deltaX) > 30);
+    if (shouldChange && nextIndex !== modeIndex) {
+      finishModeSwipe(modeOrder[nextIndex], direction * -width);
+    } else {
+      setModeSwipeOffset(0, true);
+      window.setTimeout(() => {
+        modeSwipeTrackRef.current?.classList.remove("swipeAnimating");
+        modeSwipeSurfaceRef.current?.classList.remove("swipeDragging");
+        modeTabsRef.current?.classList.remove("swipeAnimating");
+      }, 220);
+    }
+  }
+
+  function renderModeContent(paneMode) {
+    if (paneMode === "history") {
+      return (
         <TimesView
           records={records}
           memberPhotos={memberPhotos}
@@ -1164,32 +1101,79 @@ function MeetsView({ records, allRecords, upcomingMeets, archivedMembers, member
           onReadingUpdate={onReadingUpdate}
           onBirthdateUpdate={onBirthdateUpdate}
         />
-      ) : (
-        <>
-          <section className="meetList" aria-label="大会一覧">
-            {meets.map((meet) => (
-              <button className="meetCard" key={meet.key} onClick={() => setSelectedMeet(meet)}>
-                <div>
-                  <time>{formatMeetDateRange(meet)}</time>
-                  <h2>{meet.name}</h2>
-                  <p>{meet.place}</p>
-                </div>
-                <span>
-                  {meet.status === "upcoming"
-                    ? `${new Set(meet.entries.map((entry) => normalizeMemberName(entry.swimmer))).size}名 / ${new Set(meet.entries.map((entry) => upcomingEventSectionName(entry.event))).size}種目`
-                    : `${meet.records.length}件`}
-                </span>
-              </button>
-            ))}
-          </section>
-          {meets.length === 0 ? (
-            <EmptyState
-              title={mode === "upcoming" ? "出場予定の大会はありません" : "保存済みの大会はありません"}
-              text={mode === "upcoming" ? "RSケーニーズのエントリーが取得されると自動表示されます。" : "記録が取得されるとここに自動表示されます。"}
-            />
-          ) : null}
-        </>
-      )}
+      );
+    }
+
+    const paneMeets = paneMode === "upcoming" ? futureMeets : pastMeets;
+    return (
+      <>
+        <section className="meetList" aria-label="大会一覧">
+          {paneMeets.map((meet) => (
+            <button className="meetCard" key={meet.key} onClick={() => setSelectedMeet(meet)}>
+              <div>
+                <time>{formatMeetDateRange(meet)}</time>
+                <h2>{meet.name}</h2>
+                <p>{meet.place}</p>
+              </div>
+              <span>
+                {meet.status === "upcoming"
+                  ? `${new Set(meet.entries.map((entry) => normalizeMemberName(entry.swimmer))).size}名 / ${new Set(meet.entries.map((entry) => upcomingEventSectionName(entry.event))).size}種目`
+                  : `${meet.records.length}件`}
+              </span>
+            </button>
+          ))}
+        </section>
+        {paneMeets.length === 0 ? (
+          <EmptyState
+            title={paneMode === "upcoming" ? "出場予定の大会はありません" : "保存済みの大会はありません"}
+            text={paneMode === "upcoming" ? "RSケーニーズのエントリーが取得されると自動表示されます。" : "記録が取得されるとここに自動表示されます。"}
+          />
+        ) : null}
+      </>
+    );
+  }
+
+  return (
+    <section
+      className={`meetsView ${mode === "history" ? "historyMode" : ""}`}
+    >
+      <section
+        className="meetModeTabs"
+        ref={modeTabsRef}
+        style={{ "--meet-mode-offset": `${modeIndex * 100}%`, "--meet-mode-drag-offset": "0%" }}
+        aria-label="大会の開催状況"
+      >
+        <button className={mode === "upcoming" ? "active" : ""} onClick={() => changeMode("upcoming")}>開催予定</button>
+        <button className={mode === "past" ? "active" : ""} onClick={() => changeMode("past")}>大会結果</button>
+        <button className={mode === "history" ? "active" : ""} onClick={() => changeMode("history")}>結果一覧</button>
+      </section>
+      <div
+        className="swipeSurface meetModeSwipeSurface"
+        ref={modeSwipeSurfaceRef}
+        onTouchStart={handleModeTouchStart}
+        onTouchMove={handleModeTouchMove}
+        onTouchEnd={handleModeTouchEnd}
+        onTouchCancel={() => {
+          modeSwipeStartRef.current = null;
+          setModeSwipeOffset(0, true);
+        }}
+      >
+        <div
+          className="swipeTrack meetModeSwipeTrack"
+          ref={modeSwipeTrackRef}
+          style={{ "--track-index-offset": `${modeIndex * -100}%`, "--swipe-offset": "0px" }}
+        >
+          {modeOrder.map((paneMode) => (
+            <section
+              className={`swipePane ${paneMode === mode ? "activePane" : ""}`}
+              aria-hidden={paneMode !== mode}
+              key={paneMode}
+            >
+              {renderModeContent(paneMode)}
+            </section>
+          ))}
+        </div>
+      </div>
       {selectedMeet ? (
         <MeetModal
           meet={selectedMeet}
