@@ -299,8 +299,7 @@ h1 {
 
 .app.dockHidden .controls,
 .app.dockHidden .memberFilterBar,
-.app.dockHidden .eventFilterBar,
-.app.dockHidden .meetModeTabs {
+.app.dockHidden .eventFilterBar {
   opacity: 0;
   pointer-events: none;
   transform: translate(-50%, calc(100% + 90px));
