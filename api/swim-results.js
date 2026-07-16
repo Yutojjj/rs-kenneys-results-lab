@@ -223,7 +223,7 @@ function normalizeOfficialRecords(payload, job, cutoff) {
         grade,
         event: [gender, distance, style, division, waterway ? `(${waterway})` : ""].filter(Boolean).join(" "),
         time: result.result_time || "",
-        rank: "",
+        rank: extractRank(result),
         meet: String(result.game_name || "").replace(/^[^：:]+[：:]/, ""),
         place: "",
         note: result.is_best_record ? "公式サイト自己ベスト" : "",
@@ -233,6 +233,28 @@ function normalizeOfficialRecords(payload, job, cutoff) {
     }
   }
   return records;
+}
+
+function extractRank(result) {
+  const candidates = [
+    result?.rank,
+    result?.ranking,
+    result?.result_rank,
+    result?.rank_order,
+    result?.order,
+    result?.place,
+    result?.rank_no,
+    result?.ranking_no,
+    result?.rank_number,
+    result?.ranking_number,
+    result?.rank?.name,
+    result?.ranking?.name,
+    result?.ranking?.rank,
+    result?.ranking?.order
+  ];
+  const value = candidates.find((candidate) => candidate !== undefined && candidate !== null && String(candidate).trim() !== "");
+  if (value === undefined || value === null) return "";
+  return String(value).replace(/位$/, "").trim();
 }
 
 function normalizeMember(member) {
