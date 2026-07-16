@@ -19,7 +19,7 @@
 ## データの流れ
 
 ```text
-外部結果フィード
+Results of Japan Swimming 公式API
   -> /api/swim-results
   -> RSケーニーズの結果と出場予定だけを整形
   -> Firestoreへ追記保存
@@ -34,6 +34,6 @@ Firebaseの準備は `FIREBASE_SETUP.md` の順番で進めてください。
 
 ## 現在の取得アダプター
 
-`api/swim-results.js` は、外部JSONフィードを受け取ってアプリ形式へ変換する入口です。フィードの `upcomingMeets` 内にRSケーニーズのエントリーがある大会だけ開催前へ保存します。Vercelの `SWIM_RESULTS_FEED_URL` が未設定の場合は、Firestoreの保存済みデータだけを表示します。
+`api/swim-results.js` は `result.swim.or.jp` の公開APIから所属名「ケーニーズ」を検索し、所属コード `22285` の選手だけを取得します。現在の登録選手46名を対象に、種目・長水路/短水路ごとの過去12か月の大会記録を取得し、アプリ形式へ変換します。
 
-`result.swim.or.jp/player-search` は画面HTML内に結果を持たず内部APIから取得するため、そのAPI仕様を確認後、`SWIM_RESULTS_FEED_URL` または取得アダプターを接続します。画面とFirestoreの構造はそのまま利用できます。
+取得済み記録はアプリ起動時にFirestoreへ追記保存されます。公式サイト側から古い記録が消えたり、一時的に取得できなかった場合も、Firestoreに保存済みの記録は削除しません。

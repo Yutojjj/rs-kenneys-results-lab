@@ -1,4 +1,9 @@
-const DEFAULT_TEAM = "RSケーニーズ";
+const API_BASE = "https://result.swim.or.jp/api/v1";
+const PLAYER_SEARCH_URL = "https://result.swim.or.jp/player-search";
+const TEAM_NAME = "RSケーニーズ";
+const TEAM_SEARCH_TERM = "ケーニーズ";
+const TEAM_CODE = "22285";
+const PERIOD_CODE = 3;
 
 export default async function handler(request, response) {
   if (request.method !== "GET") {
@@ -6,107 +11,206 @@ export default async function handler(request, response) {
     return;
   }
 
-  const team = DEFAULT_TEAM;
-  const feedUrl = process.env.SWIM_RESULTS_FEED_URL;
-  if (!feedUrl) {
-    response.status(200).json({ records: [], upcomingMeets: [], sourceStatus: "feed-not-configured", checkedAt: new Date().toISOString() });
-    return;
-  }
-
   try {
-    const upstream = await fetch(feedUrl, { headers: { Accept: "application/json", "User-Agent": "RS-Kenneys-Results-Lab/1.0" } });
-    if (!upstream.ok) throw new Error(`upstream returned ${upstream.status}`);
-    const payload = await upstream.json();
-    const records = findRecordArray(payload)
-      .map(normalizeFeedRecord)
-      .filter((record) => record.swimmer && record.date && record.event)
-      .filter((record) => !record.team || matchesTeam(record.team, team));
-    const upcomingMeets = findMeetArray(payload)
-      .map((meet, index) => normalizeFeedMeet(meet, team, index))
-      .filter((meet) => meet.date && meet.entries.length > 0);
+    const months = clampNumber(request.query?.months, 12, 1, 24);
+    const cutoff = createCutoffDate(months);
+    const rosterPayload = await fetchOfficialJson("/athletes", {
+      entry_group_name: TEAM_SEARCH_TERM,
+      member_group_code: 99,
+      school_class_code: 99,
+      gender_code: 99
+    });
+    const members = (rosterPayload?.data || []).filter((member) => String(member?.entry_group?.code || "") === TEAM_CODE);
 
-    response.setHeader("Cache-Control", "s-maxage=300, stale-while-revalidate=1800");
-    response.status(200).json({ records, upcomingMeets, sourceStatus: "ok", checkedAt: new Date().toISOString() });
+    const membersWithEntries = await mapLimit(members, 12, async (member) => {
+      const athleteId = encodeAthleteCode(member.swimmer_code);
+      try {
+        const entries = await fetchOfficialJson(`/athletes/${athleteId}/entries`, { period_code: PERIOD_CODE });
+        return { member, athleteId, entries: Array.isArray(entries) ? entries : [] };
+      } catch (error) {
+        console.warn(`Entry fetch failed for ${member.swimmer_code}`, error.message);
+        return { member, athleteId, entries: [] };
+      }
+    });
+
+    const jobs = buildRecordJobs(membersWithEntries);
+    let failedJobs = 0;
+    const resultGroups = await mapLimit(jobs, 16, async (job) => {
+      try {
+        const payload = await fetchOfficialJson(
+          `/athletes/${job.athleteId}/results/waterways/${job.waterway.code}/swimming_styles/${job.entry.swimming_style.code}/distances/${job.entry.distance.code}/records`,
+          { period_code: PERIOD_CODE }
+        );
+        return normalizeOfficialRecords(payload, job, cutoff);
+      } catch (error) {
+        failedJobs += 1;
+        console.warn(`Record fetch failed for ${job.member.swimmer_code}`, error.message);
+        return [];
+      }
+    });
+
+    const records = dedupeRecords(resultGroups.flat()).sort((a, b) => b.date.localeCompare(a.date));
+    response.setHeader("Cache-Control", "s-maxage=300, stale-while-revalidate=900");
+    response.status(200).json({
+      records,
+      upcomingMeets: [],
+      members: members.map(normalizeMember),
+      sourceStatus: failedJobs ? "partial" : "ok",
+      diagnostics: {
+        memberCount: members.length,
+        recordCount: records.length,
+        failedRecordRequests: failedJobs
+      },
+      checkedAt: new Date().toISOString()
+    });
   } catch (error) {
-    console.error("Swim results sync failed", error);
-    response.status(502).json({ error: "結果データの取得に失敗しました。", records: [], upcomingMeets: [] });
+    console.error("Official swim results sync failed", error);
+    response.status(502).json({
+      error: "日本水泳連盟の選手記録を取得できませんでした。時間をおいて再度更新してください。",
+      records: [],
+      upcomingMeets: []
+    });
   }
 }
 
-function findRecordArray(payload) {
-  if (Array.isArray(payload)) return payload;
-  if (Array.isArray(payload?.records)) return payload.records;
-  if (Array.isArray(payload?.data?.records)) return payload.data.records;
-  if (Array.isArray(payload?.data?.players)) return payload.data.players;
-  if (Array.isArray(payload?.results)) return payload.results;
-  return [];
+function buildRecordJobs(membersWithEntries) {
+  const jobs = [];
+  for (const item of membersWithEntries) {
+    for (const entry of item.entries) {
+      for (const waterway of entry.waterways || []) {
+        jobs.push({ ...item, entry, waterway });
+      }
+    }
+  }
+  return jobs;
 }
 
-function findMeetArray(payload) {
-  if (Array.isArray(payload?.upcomingMeets)) return payload.upcomingMeets;
-  if (Array.isArray(payload?.meets)) return payload.meets;
-  if (Array.isArray(payload?.competitions)) return payload.competitions;
-  if (Array.isArray(payload?.data?.upcomingMeets)) return payload.data.upcomingMeets;
-  if (Array.isArray(payload?.data?.meets)) return payload.data.meets;
-  return [];
+function normalizeOfficialRecords(payload, job, cutoff) {
+  const member = job.member;
+  const sourceUrl = `https://result.swim.or.jp/athletes/${job.athleteId}`;
+  const grade = formatSchoolGrade(member.school_class);
+  const gender = member.gender?.name || "";
+  const distance = job.entry.distance?.name || "";
+  const style = job.entry.swimming_style?.name || "";
+  const waterway = job.waterway?.name || "";
+  const records = [];
+
+  for (const yearGroup of payload?.result || []) {
+    for (const result of yearGroup?.data || []) {
+      const date = normalizeDate(result.result_date);
+      if (!date || date < cutoff) continue;
+      const division = result.division?.name || "";
+      records.push({
+        id: `result-swim-${result.result_id}`,
+        resultId: result.result_id,
+        memberCode: String(member.swimmer_code || ""),
+        team: TEAM_NAME,
+        date,
+        swimmer: member.swimmer_name || "",
+        gender,
+        grade,
+        event: [gender, distance, style, division, waterway ? `(${waterway})` : ""].filter(Boolean).join(" "),
+        time: result.result_time || "",
+        rank: "",
+        meet: String(result.game_name || "").replace(/^[^：:]+[：:]/, ""),
+        place: "",
+        note: result.is_best_record ? "公式サイト自己ベスト" : "",
+        isBestRecord: Boolean(result.is_best_record),
+        sourceUrl
+      });
+    }
+  }
+  return records;
 }
 
-function normalizeFeedRecord(record) {
-  const eventParts = [record.gender || record.gender_name, record.age_class || record.class_name, record.distance || record.distance_name, record.style || record.swimming_style_name, record.round || record.race_division_name].filter(Boolean);
+function normalizeMember(member) {
   return {
-    id: record.id || record.result_id || record.record_id || "",
-    team: record.team || record.club || record.club_name || record.entry_group_name || "",
-    date: normalizeDate(record.date || record.event_date || record.race_date),
-    swimmer: record.swimmer || record.player_name || record.swimmer_name || record.name || "",
-    event: record.event || record.event_name || eventParts.join(" "),
-    time: record.time || record.record || record.result_time || record.record_value || "",
-    rank: record.rank || record.ranking || record.place_rank || "",
-    meet: record.meet || record.tournament_name || record.competition_name || "",
-    place: record.place || record.venue || record.venue_name || "",
-    sourceUrl: record.sourceUrl || record.url || ""
+    code: String(member.swimmer_code || ""),
+    name: member.swimmer_name || "",
+    team: TEAM_NAME,
+    teamCode: TEAM_CODE,
+    gender: member.gender?.name || "",
+    grade: formatSchoolGrade(member.school_class),
+    sourceUrl: `${PLAYER_SEARCH_URL}?entry_group_name=${encodeURIComponent(TEAM_SEARCH_TERM)}`
   };
 }
 
-function normalizeFeedMeet(meet, team, index) {
-  const rawEntries = meet.entries || meet.entrants || meet.members || meet.players || [];
-  const entries = rawEntries
-    .map(normalizeFeedEntry)
-    .filter((entry) => entry.swimmer && entry.event)
-    .filter((entry) => !entry.team || matchesTeam(entry.team, team));
-  return {
-    id: meet.id || meet.competition_id || `upcoming-${index}`,
-    date: normalizeDate(meet.date || meet.startDate || meet.start_date),
-    endDate: normalizeDate(meet.endDate || meet.end_date || meet.date || meet.startDate),
-    name: meet.name || meet.title || meet.tournament_name || meet.competition_name || "大会名未取得",
-    place: meet.place || meet.venue || meet.venue_name || "",
-    sourceUrl: meet.sourceUrl || meet.url || "",
-    team,
-    status: "upcoming",
-    entries
-  };
+async function fetchOfficialJson(path, params = {}, attempt = 0) {
+  const url = new URL(`${API_BASE}${path}`);
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== "") url.searchParams.set(key, String(value));
+  });
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 12000);
+  try {
+    const upstream = await fetch(url, {
+      signal: controller.signal,
+      headers: {
+        Accept: "application/json",
+        "User-Agent": "RS-Kenneys-Results-Lab/1.0"
+      }
+    });
+    if (!upstream.ok) {
+      if (attempt < 1 && (upstream.status === 429 || upstream.status >= 500)) {
+        await delay(350);
+        return fetchOfficialJson(path, params, attempt + 1);
+      }
+      throw new Error(`Official API returned ${upstream.status}`);
+    }
+    return upstream.json();
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
-function normalizeFeedEntry(entry) {
-  const eventParts = [entry.gender || entry.gender_name, entry.distance || entry.distance_name, entry.style || entry.swimming_style_name, entry.round || entry.race_division_name].filter(Boolean);
-  return {
-    id: entry.id || entry.entry_id || "",
-    team: entry.team || entry.club || entry.club_name || entry.entry_group_name || "",
-    swimmer: entry.swimmer || entry.player_name || entry.swimmer_name || entry.name || "",
-    reading: entry.reading || entry.kana || entry.player_kana || "",
-    gender: entry.gender || entry.gender_name || "",
-    age: Number(entry.age) || "",
-    event: entry.event || entry.event_name || eventParts.join(" "),
-    entryTime: entry.entryTime || entry.entry_time || entry.seed_time || ""
-  };
+async function mapLimit(items, limit, mapper) {
+  const output = new Array(items.length);
+  let nextIndex = 0;
+  async function worker() {
+    while (nextIndex < items.length) {
+      const index = nextIndex;
+      nextIndex += 1;
+      output[index] = await mapper(items[index], index);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return output;
+}
+
+function dedupeRecords(records) {
+  const byId = new Map();
+  records.forEach((record) => byId.set(record.id, record));
+  return Array.from(byId.values());
+}
+
+function encodeAthleteCode(code) {
+  return 3 * (Number(code) + 10000000) + 3;
+}
+
+function formatSchoolGrade(schoolClass) {
+  const name = schoolClass?.name || "";
+  const grade = schoolClass?.school_grades || schoolClass?.school_grade || "";
+  const prefix = name === "小学" ? "小" : name === "中学" ? "中" : name === "高校" ? "高" : name === "大学" ? "大" : name;
+  return grade && Number(grade) !== 99 ? `${prefix}${grade}` : prefix;
+}
+
+function createCutoffDate(months) {
+  const cutoff = new Date();
+  cutoff.setMonth(cutoff.getMonth() - months);
+  return `${cutoff.getFullYear()}/${String(cutoff.getMonth() + 1).padStart(2, "0")}/${String(cutoff.getDate()).padStart(2, "0")}`;
 }
 
 function normalizeDate(value) {
-  if (!value) return "";
-  return String(value).slice(0, 10).replace(/-/g, "/");
+  return String(value || "").slice(0, 10).replace(/-/g, "/");
 }
 
-function matchesTeam(value, team) {
-  const normalize = (text) => String(text || "").normalize("NFKC").replace(/[\s・･]/g, "").toLowerCase();
-  const normalizedValue = normalize(value);
-  return normalizedValue === normalize(team) || normalizedValue.includes("ケーニーズ");
+function clampNumber(value, fallback, min, max) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return fallback;
+  return Math.min(max, Math.max(min, Math.round(number)));
+}
+
+function delay(milliseconds) {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }

@@ -27,9 +27,8 @@ VITE_SWIM_RESULTS_PROXY_URL
 
 4. `VITE_FIREBASE_BOARD_ID` は `rs-kenneys-results-lab`、`VITE_SWIM_RESULTS_PROXY_URL` は `/api/swim-results` とする
 5. Production / Preview / Developmentの3環境へ適用する
-6. 外部取得フィードが確定した時だけ、サーバー専用の `SWIM_RESULTS_FEED_URL` を追加する
-7. Deployを押す
+6. Deployを押す
 
 ## 公開しない値
 
-`SWIM_RESULTS_FEED_URL` や将来追加する管理用トークンには `VITE_` を付けず、VercelのEnvironment Variablesだけに保存する。`.env.local`、`.vercel`、ビルド成果物はGit/Vercel送信対象外に設定済み。
+FirebaseのWeb設定値はブラウザーで使うため完全には非公開にできません。データ保護はFirebaseルールとApp Checkで行います。将来追加する管理用トークンには `VITE_` を付けず、VercelのEnvironment Variablesだけに保存してください。`.env.local`、`.vercel`、ビルド成果物はGit/Vercel送信対象外に設定済みです。

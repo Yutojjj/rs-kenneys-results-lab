@@ -1,7 +1,7 @@
 {
   "functions": {
     "api/swim-results.js": {
-      "maxDuration": 30
+      "maxDuration": 60
     },
     "api/qualification.js": {
       "maxDuration": 30
