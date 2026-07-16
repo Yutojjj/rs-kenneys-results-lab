@@ -1278,6 +1278,7 @@ h1 {
   display: flex;
   align-items: center;
   gap: 6px;
+  padding-right: 52px;
 }
 
 .modalFilterButton {
@@ -1304,7 +1305,9 @@ h1 {
 }
 
 .meetModalHeaderActions .closeButton {
-  position: static;
+  position: absolute;
+  top: 6px;
+  right: 6px;
 }
 
 .memberModal {
@@ -1950,7 +1953,7 @@ h1 {
 }
 
 .upcomingEntryGrid {
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .upcomingEntryCard,
@@ -1973,7 +1976,8 @@ h1 {
 }
 
 .upcomingEntryCard {
-  grid-template-columns: minmax(92px, 1.25fr) minmax(58px, 0.7fr) minmax(86px, 0.9fr);
+  grid-template-columns: minmax(0, 1fr) max-content;
+  min-height: 62px;
 }
 
 .pastMeetResultCard {
@@ -2131,6 +2135,10 @@ h1 {
     gap: 5px;
   }
 
+  .upcomingEntryGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .pastMeetResultGrid {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -2143,7 +2151,10 @@ h1 {
   }
 
   .upcomingEntryCard {
-    grid-template-columns: minmax(88px, 1.15fr) minmax(52px, 0.65fr) minmax(82px, 0.9fr);
+    grid-template-columns: minmax(0, 1fr) max-content;
+    gap: 4px;
+    min-height: 62px;
+    padding: 5px 6px;
   }
 
   .pastMeetResultCard {
@@ -2161,7 +2172,7 @@ h1 {
   .upcomingBestTime strong {
     overflow: hidden;
     max-width: 100%;
-    font-size: 15px;
+    font-size: 14px;
     text-overflow: ellipsis;
   }
 

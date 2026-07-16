@@ -1489,10 +1489,7 @@ function UpcomingMeetModal({ meet, records, archivedMembers, memberPhotos, membe
                     <div className="upcomingEntryMember">
                       {entry.reading ? <small>{entry.reading}</small> : null}
                       <strong>{entry.swimmer}</strong>
-                    </div>
-                    <div className="upcomingEntryMeta">
-                      <span>{entry.gender || "-"}</span>
-                      <strong>{entry.age ? `${entry.age}歳` : "未設定"}</strong>
+                      <span>{entry.gender || "-"} / {entry.age ? `${entry.age}歳` : "未設定"}</span>
                     </div>
                     <div className="upcomingBestTime">
                       <span>BEST</span>
