@@ -117,58 +117,66 @@ async function fetchViaProxy(settings) {
     throw new Error("取得データの形式が想定と違います。records 配列を返すようにしてください。");
   }
 
-  const rankDetails = await fetchRankDetailsViaProxy(settings, payload.records);
-  if (rankDetails.length) {
-    const detailsByResultId = new Map(rankDetails.map((detail) => [String(detail.resultId), detail]));
-    payload.records = payload.records.map((record) => {
-      const detail = detailsByResultId.get(String(record.resultId || ""));
-      if (!detail) return record;
-      return {
-        ...record,
-        rank: detail.rank || record.rank || "",
-        heat: detail.heat || record.heat || "",
-        lane: detail.lane || record.lane || "",
-        place: detail.place || record.place || "",
-        event: detail.event || record.event,
-        date: detail.date || record.date,
-        time: detail.time || record.time
-      };
-    });
-  }
-
   return payload;
 }
 
-async function fetchRankDetailsViaProxy(settings, records) {
-  const resultIds = Array.from(new Set(records.map((record) => String(record.resultId || "")).filter(Boolean)));
+export async function syncRecordRanks(previousState, onProgress) {
+  let nextState = previousState;
+  const resultIds = Array.from(new Set((previousState.recentResults || [])
+    .filter((record) => !record.rank)
+    .map(recordResultId)
+    .filter(Boolean)));
   const batches = [];
-  for (let index = 0; index < resultIds.length; index += 30) {
-    batches.push(resultIds.slice(index, index + 30));
+  for (let index = 0; index < resultIds.length; index += 12) {
+    batches.push(resultIds.slice(index, index + 12));
   }
 
-  const details = [];
   for (let index = 0; index < batches.length; index += 3) {
     const group = batches.slice(index, index + 3);
-    const results = await Promise.all(group.map(async (batch) => {
-      const url = new URL(settings.proxyUrl, window.location.origin);
-      url.searchParams.set("mode", "ranks");
-      url.searchParams.set("resultIds", batch.join(","));
-      url.searchParams.set("refresh", String(Date.now()));
-      try {
-        const response = await fetch(url.toString(), {
-          cache: "no-store",
-          headers: { Accept: "application/json", "Cache-Control": "no-cache" }
-        });
-        if (!response.ok) return [];
-        const payload = await response.json();
-        return Array.isArray(payload.details) ? payload.details : [];
-      } catch {
-        return [];
-      }
-    }));
-    details.push(...results.flat());
+    const details = (await Promise.all(group.map((batch) => fetchRankDetailBatch(previousState.settings, batch)))).flat();
+    if (!details.length) continue;
+
+    const detailsByResultId = new Map(details.map((detail) => [String(detail.resultId), detail]));
+    const recentResults = (nextState.recentResults || []).map((record) => {
+      const detail = detailsByResultId.get(recordResultId(record));
+      if (!detail?.rank) return record;
+      return {
+        ...record,
+        resultId: recordResultId(record),
+        rank: detail.rank,
+        heat: detail.heat || record.heat || "",
+        lane: detail.lane || record.lane || ""
+      };
+    });
+    nextState = { ...nextState, recentResults };
+    await onProgress?.(nextState);
   }
-  return details;
+
+  return nextState;
+}
+
+async function fetchRankDetailBatch(settings, resultIds) {
+  const url = new URL(settings.proxyUrl, window.location.origin);
+  url.searchParams.set("mode", "ranks");
+  url.searchParams.set("resultIds", resultIds.join(","));
+  url.searchParams.set("refresh", String(Date.now()));
+  try {
+    const response = await fetch(url.toString(), {
+      cache: "no-store",
+      headers: { Accept: "application/json", "Cache-Control": "no-cache" }
+    });
+    if (!response.ok) return [];
+    const payload = await response.json();
+    return Array.isArray(payload.details) ? payload.details : [];
+  } catch {
+    return [];
+  }
+}
+
+function recordResultId(record) {
+  if (record?.resultId) return String(record.resultId);
+  const match = String(record?.id || "").match(/^result-swim-(\d+)$/);
+  return match?.[1] || "";
 }
 
 function normalizeRecords(records, teamName) {

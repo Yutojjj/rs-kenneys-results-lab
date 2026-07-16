@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import "./styles.css";
 import { loadBoardState, saveBoardState, subscribeBoardState, uploadMemberImage } from "./firebaseStorage";
-import { getStoredState, saveStoredState, syncRecords } from "./recordSync";
+import { getStoredState, saveStoredState, syncRecordRanks, syncRecords } from "./recordSync";
 import { bestQualification, evaluateRecordQualification, loadQualificationStandards, qualificationEvent } from "./qualification";
 
 const tabs = [
@@ -68,10 +68,15 @@ function App() {
     setError("");
     const syncTask = (async () => {
       try {
-        const nextState = await syncRecords(stateRef.current);
+        let nextState = await syncRecords(stateRef.current);
         stateRef.current = nextState;
         setState(nextState);
         await persistState(nextState);
+        nextState = await syncRecordRanks(nextState, async (rankedState) => {
+          stateRef.current = rankedState;
+          setState(rankedState);
+          await persistState(rankedState);
+        });
       } catch (syncError) {
         if (!silent || stateRef.current.recentResults.length === 0) setError(syncError.message);
       } finally {
