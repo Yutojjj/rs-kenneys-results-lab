@@ -65,6 +65,7 @@ export default async function handler(request, response) {
 
     const records = dedupeRecords(resultGroups.flat()).sort((a, b) => b.date.localeCompare(a.date));
     const upcomingMeets = await upcomingMeetsPromise;
+    const upcomingEntryCount = upcomingMeets.reduce((total, meet) => total + (meet.entries?.length || 0), 0);
     response.setHeader("Cache-Control", "no-store, max-age=0");
     response.status(200).json({
       records,
@@ -78,6 +79,7 @@ export default async function handler(request, response) {
         rankedRecordCount: records.filter((record) => Boolean(record.rank)).length,
         failedRecordRequests: failedJobs,
         upcomingMeetCount: upcomingMeets.length,
+        upcomingEntryCount,
         failedUpcomingMeetRequests: upcomingMeetSyncFailed ? 1 : 0
       },
       checkedAt: new Date().toISOString()
@@ -130,36 +132,61 @@ async function respondWithRankDetails(request, response) {
 async function fetchUpcomingMeets() {
   const games = await fetchUpcomingGameCandidates(competitionYearsForUpcomingMeets());
   const meets = await mapLimit(games, 4, async (game) => {
-    const gameCode = String(game?.game_code || "");
-    if (!gameCode) return null;
+    try {
+      const gameCode = String(game?.game_code || "");
+      if (!gameCode) return null;
 
-    const groupsPayload = await fetchOfficialJson(`/games/${encodeURIComponent(gameCode)}/entry_groups`, {
-      keyword: TEAM_SEARCH_TERM
-    });
-    const team = (groupsPayload?.result || []).find((group) => String(group?.entry_group_code || "") === TEAM_CODE);
-    if (!team) return null;
+      const groupsPayload = await fetchOfficialJson(`/games/${encodeURIComponent(gameCode)}/entry_groups`, {
+        keyword: TEAM_SEARCH_TERM
+      });
+      const detail = await fetchTeamEntryDetail(gameCode, groupsPayload);
+      if (!detail) return null;
 
-    const teamName = team.entry_group_name || TEAM_NAME;
-    const detail = await fetchOfficialJson(
-      `/games/${encodeURIComponent(gameCode)}/entry_groups/${encodeURIComponent(TEAM_CODE)}/${encodeURIComponent(teamName)}`
-    );
-    const entries = normalizeUpcomingEntries(detail?.results || [], game);
-    if (!entries.length) return null;
+      const entries = normalizeUpcomingEntries(firstArray(detail, ["results", "result", "data"]), game);
+      if (!entries.length) return null;
 
-    return {
-      id: `result-swim-game-${gameCode}`,
-      date: normalizeDate(game.start_date),
-      endDate: normalizeDate(game.end_date || game.start_date),
-      name: String(game.game_name || "").replace(/^[^：:]+[：:]/, ""),
-      place: game.pool || "",
-      team: TEAM_NAME,
-      status: "upcoming",
-      sourceUrl: `https://result.swim.or.jp/tournament/${encodeURIComponent(gameCode)}`,
-      entries
-    };
+      return {
+        id: `result-swim-game-${gameCode}`,
+        date: normalizeDate(game.start_date),
+        endDate: normalizeDate(game.end_date || game.start_date),
+        name: String(game.game_name || "").replace(/^[^：:]+[：:]/, ""),
+        place: game.pool || "",
+        team: TEAM_NAME,
+        status: "upcoming",
+        sourceUrl: `https://result.swim.or.jp/tournament/${encodeURIComponent(gameCode)}`,
+        entries
+      };
+    } catch (error) {
+      console.warn(`Upcoming meet detail fetch failed for ${game?.game_code || "unknown"}`, error.message);
+      return null;
+    }
   });
 
   return meets.filter(Boolean).sort((a, b) => a.date.localeCompare(b.date));
+}
+
+async function fetchTeamEntryDetail(gameCode, groupsPayload) {
+  const groups = firstArray(groupsPayload, ["result", "data", "results"]);
+  const team = groups.find((group) => String(group?.entry_group_code || group?.code || group?.entry_group?.code || "") === TEAM_CODE);
+  const candidateNames = Array.from(new Set([
+    team?.entry_group_name,
+    team?.name,
+    team?.entry_group?.name,
+    TEAM_NAME,
+    "ＲＳケーニーズ",
+    "RSｹｰﾆｰｽﾞ"
+  ].filter(Boolean)));
+
+  for (const teamName of candidateNames) {
+    try {
+      return await fetchOfficialJson(
+        `/games/${encodeURIComponent(gameCode)}/entry_groups/${encodeURIComponent(TEAM_CODE)}/${encodeURIComponent(teamName)}`
+      );
+    } catch (error) {
+      console.warn(`Team entry detail fetch failed for ${gameCode}/${teamName}`, error.message);
+    }
+  }
+  return null;
 }
 
 async function fetchUpcomingGameCandidates(years) {
@@ -219,8 +246,8 @@ function normalizeUpcomingEntries(groups, game) {
       game?.waterway?.name ? `(${game.waterway.name})` : ""
     ].filter(Boolean).join(" ");
 
-    for (const record of group?.records || []) {
-      const swimmer = record?.swimmers || {};
+    for (const record of firstArray(group, ["records", "data", "results"])) {
+      const swimmer = record?.swimmers || record?.swimmer || {};
       const swimmerName = swimmer.swimmer_name || "";
       if (!swimmerName) continue;
       entries.push({
@@ -427,6 +454,13 @@ function createCutoffDate(months) {
 
 function normalizeDate(value) {
   return String(value || "").slice(0, 10).replace(/-/g, "/");
+}
+
+function firstArray(source, keys) {
+  for (const key of keys) {
+    if (Array.isArray(source?.[key])) return source[key];
+  }
+  return Array.isArray(source) ? source : [];
 }
 
 function clampNumber(value, fallback, min, max) {
