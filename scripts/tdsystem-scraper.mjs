@@ -2,7 +2,7 @@ import { fileURLToPath } from "node:url";
 
 const BASE_URL = "https://www.tdsystem.co.jp/";
 const DEFAULT_TEAM = "RSケーニーズ";
-const TEAM_ALIASES = ["RSケーニーズ", "ＲＳケーニーズ", "RSｹｰﾆｰｽﾞ", "ＲＳｹｰﾆｰｽﾞ", "ケーニーズ", "ｹｰﾆｰｽﾞ"];
+const TEAM_ALIASES = ["リフレッシュスクエア　ケーニーズ", "リフレッシュスクエア ケーニーズ", "RSケーニーズ", "ＲＳケーニーズ", "RSｹｰﾆｰｽﾞ", "ＲＳｹｰﾆｰｽﾞ", "ケーニーズ", "ｹｰﾆｰｽﾞ"];
 const MAX_MEETS = 90;
 const REQUEST_DELAY_MS = 0;
 const MEET_CONCURRENCY = 8;
@@ -85,7 +85,7 @@ function parseMeetLinksFromMonth(html, pageUrl) {
   const page = new URL(pageUrl);
   const year = page.searchParams.get("Y") || String(new Date().getFullYear());
   const month = page.searchParams.get("M") || String(new Date().getMonth() + 1);
-  const rows = html.match(/<TR[\s\S]*?<\/TR>/gi) || [];
+  const rows = html.match(/<tr[\s\S]*?<\/tr>/gi) || [];
 
   return rows
     .map((row) => {
@@ -153,7 +153,7 @@ function parseMeetInfo(html, link) {
 }
 
 function parseTeamProgram(html, team) {
-  const rows = html.match(/<TR[\s\S]*?<\/TR>/gi) || [];
+  const rows = html.match(/<tr[\s\S]*?<\/tr>/gi) || [];
   for (const row of rows) {
     const cells = extractCells(row);
     const teamName = cells[0] || "";
@@ -192,7 +192,7 @@ function parseRecordRows(html, context) {
       continue;
     }
 
-    const rows = chunk.match(/<TR[\s\S]*?<\/TR>/gi) || [];
+    const rows = chunk.match(/<tr[\s\S]*?<\/tr>/gi) || [];
     for (const row of rows) {
       const cells = extractCells(row);
       if (cells.length < 7 || cells[0] === "順位") continue;

@@ -4,11 +4,13 @@ const API_BASE = "https://result.swim.or.jp/api/v1";
 const PLAYER_SEARCH_URL = "https://result.swim.or.jp/player-search";
 const TEAM_NAME = "RSケーニーズ";
 const TEAM_SEARCH_TERM = "ケーニーズ";
+const TEAM_OFFICIAL_NAME = "リフレッシュスクエア　ケーニーズ";
+const TEAM_SEARCH_TERMS = ["リフレッシュスクエア", "リフレッシュ", "ケーニーズ", "RSケーニーズ", "ＲＳケーニーズ"];
 const TEAM_CODE = "22285";
 const MEMBER_GROUP_CODE = 22;
 const PERIOD_CODE = 3;
 const ENTRY_COMPLETED_STATUS = 2;
-const UPCOMING_GAME_STATUSES = [1, ENTRY_COMPLETED_STATUS, 3];
+const UPCOMING_GAME_STATUSES = [1];
 const OFFICIAL_API_HEADERS = {
   Accept: "application/json, text/plain, */*",
   "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
@@ -241,14 +243,12 @@ async function respondWithRankDetails(request, response) {
 
 async function fetchUpcomingMeets() {
   const games = await fetchUpcomingGameCandidates(competitionYearsForUpcomingMeets());
-  const meets = await mapLimit(games, 4, async (game) => {
+  const meets = await mapLimit(games, 8, async (game) => {
     try {
       const gameCode = String(game?.game_code || "");
       if (!gameCode) return null;
 
-      const groupsPayload = await fetchOfficialJson(`/games/${encodeURIComponent(gameCode)}/entry_groups`, {
-        keyword: TEAM_SEARCH_TERM
-      });
+      const groupsPayload = await fetchTeamEntryGroups(gameCode);
       const detail = await fetchTeamEntryDetail(gameCode, groupsPayload);
       if (!detail) return null;
 
@@ -275,14 +275,25 @@ async function fetchUpcomingMeets() {
   return meets.filter(Boolean).sort((a, b) => a.date.localeCompare(b.date));
 }
 
+async function fetchTeamEntryGroups(gameCode) {
+  for (const keyword of TEAM_SEARCH_TERMS) {
+    const payload = await fetchOfficialJson(`/games/${encodeURIComponent(gameCode)}/entry_groups`, { keyword });
+    if (findTeamGroup(firstArray(payload, ["result", "data", "results"]))) return payload;
+  }
+  return { result: [] };
+}
+
 async function fetchTeamEntryDetail(gameCode, groupsPayload) {
   const groups = firstArray(groupsPayload, ["result", "data", "results"]);
-  const team = groups.find((group) => String(group?.entry_group_code || group?.code || group?.entry_group?.code || "") === TEAM_CODE);
+  const team = findTeamGroup(groups);
   if (!team) return null;
   const candidateNames = Array.from(new Set([
     team?.entry_group_name,
     team?.name,
     team?.entry_group?.name,
+    team?.short_name,
+    team?.entry_group?.short_name,
+    TEAM_OFFICIAL_NAME,
     TEAM_NAME,
     "ＲＳケーニーズ",
     "RSｹｰﾆｰｽﾞ"
@@ -298,6 +309,20 @@ async function fetchTeamEntryDetail(gameCode, groupsPayload) {
     }
   }
   return null;
+}
+
+function findTeamGroup(groups) {
+  return groups.find((group) => {
+    const code = String(group?.entry_group_code || group?.code || group?.entry_group?.code || "");
+    if (code === TEAM_CODE) return true;
+    return matchesTeamName([
+      group?.entry_group_name,
+      group?.name,
+      group?.short_name,
+      group?.entry_group?.name,
+      group?.entry_group?.short_name
+    ].filter(Boolean).join(" "));
+  });
 }
 
 async function fetchUpcomingGameCandidates(years) {
@@ -326,7 +351,6 @@ async function fetchEntryCompletedGames(year, gameStatus = ENTRY_COMPLETED_STATU
   do {
     const payload = await fetchOfficialJson("/games", {
       year,
-      member_group_code: MEMBER_GROUP_CODE,
       game_status: gameStatus,
       page,
       sort_order: "ascend",
@@ -489,7 +513,7 @@ function normalizeMember(member) {
   return {
     code: String(member.swimmer_code || ""),
     name: member.swimmer_name || "",
-    team: TEAM_NAME,
+    team: member.entry_group?.name || TEAM_NAME,
     teamCode: TEAM_CODE,
     gender: member.gender?.name || "",
     grade: formatSchoolGrade(member.school_class),
@@ -562,6 +586,13 @@ function createCutoffDate(months) {
 
 function normalizeDate(value) {
   return String(value || "").slice(0, 10).replace(/-/g, "/");
+}
+
+function matchesTeamName(value) {
+  const normalized = String(value || "").normalize("NFKC").replace(/[\s・･　]/g, "").toLowerCase();
+  return normalized.includes("ケーニーズ")
+    || normalized.includes("rsケーニーズ")
+    || normalized.includes("リフレッシュスクエアケーニーズ");
 }
 
 function firstArray(source, keys) {
