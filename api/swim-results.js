@@ -11,6 +11,10 @@ const MEMBER_GROUP_CODE = 22;
 const PERIOD_CODE = 3;
 const ENTRY_COMPLETED_STATUS = 2;
 const UPCOMING_GAME_STATUSES = [1];
+const TRACKED_UPCOMING_MEET_PATTERNS = [
+  /三河.*高(?:校|等学校)/,
+  /高(?:校|等学校).*三河/
+];
 const OFFICIAL_API_HEADERS = {
   Accept: "application/json, text/plain, */*",
   "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
@@ -89,7 +93,8 @@ export default async function handler(request, response) {
       upcomingFallback = await fetchTdsystemFallback(request, new Error("Official API returned no upcoming RS Kenneys meets"), {
         limitMeets: 80,
         months: 1,
-        futureMonths: 2
+        futureMonths: 2,
+        memberNames: members.map((member) => member.swimmer_name).filter(Boolean)
       });
       if (upcomingFallback.upcomingMeets.length) upcomingMeets = upcomingFallback.upcomingMeets;
     }
@@ -184,7 +189,8 @@ async function fetchTdsystemFallback(request, originalError, options = {}) {
       source: "https://www.tdsystem.co.jp/",
       limitMeets: options.limitMeets || 240,
       months,
-      futureMonths: options.futureMonths ?? 6
+      futureMonths: options.futureMonths ?? 6,
+      memberNames: options.memberNames || []
     });
     return {
       records: Array.isArray(result.records) ? result.records : [],
@@ -250,10 +256,10 @@ async function fetchUpcomingMeets() {
 
       const groupsPayload = await fetchTeamEntryGroups(gameCode);
       const detail = await fetchTeamEntryDetail(gameCode, groupsPayload);
-      if (!detail) return null;
+      if (!detail && !shouldIncludeUpcomingMeetByTitle(game)) return null;
 
-      const entries = normalizeUpcomingEntries(firstArray(detail, ["results", "result", "data"]), game);
-      if (!entries.length) return null;
+      const entries = detail ? normalizeUpcomingEntries(firstArray(detail, ["results", "result", "data"]), game) : [];
+      if (!entries.length && !shouldIncludeUpcomingMeetByTitle(game)) return null;
 
       return {
         id: `result-swim-game-${gameCode}`,
@@ -273,6 +279,11 @@ async function fetchUpcomingMeets() {
   });
 
   return meets.filter(Boolean).sort((a, b) => a.date.localeCompare(b.date));
+}
+
+function shouldIncludeUpcomingMeetByTitle(game) {
+  const name = String(game?.game_name || game?.name || "").normalize("NFKC");
+  return TRACKED_UPCOMING_MEET_PATTERNS.some((pattern) => pattern.test(name));
 }
 
 async function fetchTeamEntryGroups(gameCode) {

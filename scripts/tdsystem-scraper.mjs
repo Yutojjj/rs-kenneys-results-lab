@@ -6,8 +6,12 @@ const TEAM_ALIASES = ["リフレッシュスクエア　ケーニーズ", "リ�
 const MAX_MEETS = 90;
 const REQUEST_DELAY_MS = 0;
 const MEET_CONCURRENCY = 8;
+const TRACKED_UPCOMING_MEET_PATTERNS = [
+  /三河.*高(?:校|等学校)/,
+  /高(?:校|等学校).*三河/
+];
 
-export async function scrapeTdsystemRecords({ team = DEFAULT_TEAM, source = BASE_URL, limitMeets = MAX_MEETS, months = 12, futureMonths = 6 } = {}) {
+export async function scrapeTdsystemRecords({ team = DEFAULT_TEAM, source = BASE_URL, limitMeets = MAX_MEETS, months = 12, futureMonths = 6, memberNames = [] } = {}) {
   const meetLinks = await collectMeetLinks({ source, months, futureMonths, limitMeets });
   const records = [];
   const scannedMeets = [];
@@ -22,7 +26,10 @@ export async function scrapeTdsystemRecords({ team = DEFAULT_TEAM, source = BASE
     scannedMeets.push({ title: meet.name, url: meetLink.href, teamFound: Boolean(teamProgram) });
 
     if (isUpcomingMeet(meet, today)) {
-      if (!teamProgram) return;
+      const entries = teamProgram
+        ? []
+        : await findUpcomingEntriesByMemberNames(teamListHtml, meetLink.href, meet, memberNames, team);
+      if (!teamProgram && !entries.length && !shouldIncludeUpcomingMeetByTitle(meet)) return;
       upcomingMeets.push({
         id: stableId([meet.date, meet.name, meet.url]),
         date: meet.date,
@@ -30,7 +37,7 @@ export async function scrapeTdsystemRecords({ team = DEFAULT_TEAM, source = BASE
         name: meet.name,
         place: meet.place,
         sourceUrl: meet.url,
-        entries: [],
+        entries,
         teamFound: Boolean(teamProgram),
         status: "upcoming"
       });
@@ -53,6 +60,66 @@ export async function scrapeTdsystemRecords({ team = DEFAULT_TEAM, source = BASE
     upcomingMeets: uniqueMeets(upcomingMeets).sort((a, b) => a.date.localeCompare(b.date)),
     records: uniqueRecords(records).sort((a, b) => b.date.localeCompare(a.date))
   };
+}
+
+function shouldIncludeUpcomingMeetByTitle(meet) {
+  const name = String(meet?.name || "").normalize("NFKC");
+  return TRACKED_UPCOMING_MEET_PATTERNS.some((pattern) => pattern.test(name));
+}
+
+async function findUpcomingEntriesByMemberNames(programHtml, proListUrl, meet, memberNames, team) {
+  const memberKeys = new Map(memberNames
+    .map((name) => [normalizeNameKey(name), name])
+    .filter(([key]) => key));
+  if (!memberKeys.size) return [];
+
+  const programItems = parseProgramItems(programHtml);
+  const entries = [];
+  await mapWithConcurrency(programItems, 8, async (item) => {
+    await delay(REQUEST_DELAY_MS);
+    const html = await fetchText(buildRecordUrl(proListUrl, item.p, "1"));
+    entries.push(...parseUpcomingEntryRows(html, { meet, item, memberKeys, team }));
+  });
+  return dedupeUpcomingEntries(entries);
+}
+
+function parseProgramItems(html) {
+  const rows = html.match(/<tr[\s\S]*?<\/tr>/gi) || [];
+  return rows
+    .map((row) => {
+      const cells = extractCells(row);
+      const p = /name=['"]P['"]\s+value=?"?(\d+)"?/i.exec(row)?.[1];
+      if (!p || cells.length < 6) return null;
+      return {
+        p,
+        event: [cells[1], cells[2], cells[3], cells[4], cells[5]].filter(Boolean).join(" ")
+      };
+    })
+    .filter(Boolean);
+}
+
+function parseUpcomingEntryRows(html, context) {
+  const entries = [];
+  const heading = cleanText((html.match(/<H3>[\s\S]*?<\/H3>/i) || [])[0] || "");
+  const event = heading.replace(/^No\.\d+\s*/, "") || context.item.event || "種目未取得";
+  const rows = html.match(/<tr[\s\S]*?<\/tr>/gi) || [];
+  for (const row of rows) {
+    const cells = extractCells(row);
+    if (cells.length < 7 || cells[2] === "氏名") continue;
+    const swimmer = normalizeName(cells[2]);
+    const memberName = context.memberKeys.get(normalizeNameKey(swimmer));
+    if (!memberName) continue;
+    entries.push({
+      id: stableId([context.meet.date, context.meet.name, event, memberName, cells[0], cells[1]]),
+      swimmer: memberName,
+      event,
+      entryTime: cells[6] || "",
+      team: context.team,
+      school: cells[3] || "",
+      grade: cells[4] || ""
+    });
+  }
+  return entries;
 }
 
 async function collectMeetLinks({ source, months, futureMonths, limitMeets }) {
@@ -245,6 +312,10 @@ function normalizeName(name) {
   return cleanText(name).replace(/\s+/g, " ");
 }
 
+function normalizeNameKey(name) {
+  return normalizeName(name).normalize("NFKC").replace(/[\s　]/g, "");
+}
+
 function withSearchParams(url, params) {
   const nextUrl = new URL(url);
   Object.entries(params).forEach(([key, value]) => nextUrl.searchParams.set(key, value));
@@ -268,6 +339,16 @@ function uniqueMeets(meets) {
   const seen = new Set();
   return meets.filter((meet) => {
     const key = `${meet.date}-${meet.name}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function dedupeUpcomingEntries(entries) {
+  const seen = new Set();
+  return entries.filter((entry) => {
+    const key = [entry.swimmer, entry.event].join("|");
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
