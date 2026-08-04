@@ -6,6 +6,7 @@ const TEAM_CODE = "22285";
 const MEMBER_GROUP_CODE = 22;
 const PERIOD_CODE = 3;
 const ENTRY_COMPLETED_STATUS = 2;
+const UPCOMING_GAME_STATUSES = [1, ENTRY_COMPLETED_STATUS, 3];
 
 export default async function handler(request, response) {
   if (request.method !== "GET") {
@@ -127,7 +128,7 @@ async function respondWithRankDetails(request, response) {
 }
 
 async function fetchUpcomingMeets() {
-  const games = await fetchEntryCompletedGames(currentCompetitionYear());
+  const games = await fetchUpcomingGameCandidates(competitionYearsForUpcomingMeets());
   const meets = await mapLimit(games, 4, async (game) => {
     const gameCode = String(game?.game_code || "");
     if (!gameCode) return null;
@@ -161,7 +162,26 @@ async function fetchUpcomingMeets() {
   return meets.filter(Boolean).sort((a, b) => a.date.localeCompare(b.date));
 }
 
-async function fetchEntryCompletedGames(year) {
+async function fetchUpcomingGameCandidates(years) {
+  const groups = await Promise.all(years.flatMap((year) => (
+    UPCOMING_GAME_STATUSES.map((status) => fetchEntryCompletedGames(year, status).catch((error) => {
+      console.warn(`Upcoming game list fetch failed for ${year}/${status}`, error.message);
+      return [];
+    }))
+  )));
+  const today = normalizeDate(new Date().toISOString());
+  const byCode = new Map();
+  groups.flat().forEach((game) => {
+    const code = String(game?.game_code || "");
+    if (!code) return;
+    const endDate = normalizeDate(game.end_date || game.start_date);
+    if (endDate && endDate < today) return;
+    byCode.set(code, game);
+  });
+  return Array.from(byCode.values()).sort((a, b) => normalizeDate(a.start_date).localeCompare(normalizeDate(b.start_date)));
+}
+
+async function fetchEntryCompletedGames(year, gameStatus = ENTRY_COMPLETED_STATUS) {
   const games = [];
   let page = 1;
   let lastPage = 1;
@@ -169,7 +189,7 @@ async function fetchEntryCompletedGames(year) {
     const payload = await fetchOfficialJson("/games", {
       year,
       member_group_code: MEMBER_GROUP_CODE,
-      game_status: ENTRY_COMPLETED_STATUS,
+      game_status: gameStatus,
       page,
       sort_order: "ascend",
       official_code: 3
@@ -179,6 +199,11 @@ async function fetchEntryCompletedGames(year) {
     page += 1;
   } while (page <= lastPage && page <= 10);
   return games;
+}
+
+function competitionYearsForUpcomingMeets(date = new Date()) {
+  const year = currentCompetitionYear(date);
+  return [year, year + 1];
 }
 
 function normalizeUpcomingEntries(groups, game) {
