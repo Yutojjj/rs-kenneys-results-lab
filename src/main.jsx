@@ -1945,7 +1945,7 @@ function buildUpcomingMeetCards(meets, query = "") {
       name: meet.name,
       place: meet.place || "",
       sourceUrl: meet.sourceUrl || "",
-      status: "upcoming",
+      status: meet.status || "upcoming",
       records: [],
       entries: Array.isArray(meet.entries) ? meet.entries : []
     }))
@@ -1954,7 +1954,11 @@ function buildUpcomingMeetCards(meets, query = "") {
       if (!needle) return true;
       return normalizeSearchText([meet.date, meet.name, meet.place, ...meet.entries.flatMap((entry) => [entry.swimmer, entry.reading, entry.event])].filter(Boolean).join(" ")).includes(needle);
     })
-    .sort((a, b) => a.date.localeCompare(b.date));
+    .sort((a, b) => {
+      if (a.status === "recent" && b.status !== "recent") return -1;
+      if (a.status !== "recent" && b.status === "recent") return 1;
+      return a.date.localeCompare(b.date);
+    });
 }
 
 function upcomingEventSectionName(value) {
