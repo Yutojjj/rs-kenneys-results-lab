@@ -22,6 +22,7 @@ export async function scrapeTdsystemRecords({ team = DEFAULT_TEAM, source = BASE
     scannedMeets.push({ title: meet.name, url: meetLink.href, teamFound: Boolean(teamProgram) });
 
     if (isUpcomingMeet(meet, today)) {
+      if (!teamProgram) return;
       upcomingMeets.push({
         id: stableId([meet.date, meet.name, meet.url]),
         date: meet.date,
@@ -29,6 +30,7 @@ export async function scrapeTdsystemRecords({ team = DEFAULT_TEAM, source = BASE
         name: meet.name,
         place: meet.place,
         sourceUrl: meet.url,
+        entries: [],
         teamFound: Boolean(teamProgram),
         status: "upcoming"
       });

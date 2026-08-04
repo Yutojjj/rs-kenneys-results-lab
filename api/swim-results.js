@@ -1,3 +1,5 @@
+import { scrapeTdsystemRecords } from "../scripts/tdsystem-scraper.mjs";
+
 const API_BASE = "https://result.swim.or.jp/api/v1";
 const PLAYER_SEARCH_URL = "https://result.swim.or.jp/player-search";
 const TEAM_NAME = "RSケーニーズ";
@@ -65,6 +67,32 @@ export default async function handler(request, response) {
 
     const records = dedupeRecords(resultGroups.flat()).sort((a, b) => b.date.localeCompare(a.date));
     const upcomingMeets = await upcomingMeetsPromise;
+    if (!records.length && !upcomingMeets.length) {
+      const fallback = await fetchTdsystemFallback(request, new Error("Official API returned no RS Kenneys records"));
+      response.setHeader("Cache-Control", "no-store, max-age=0");
+      response.status(200).json({
+        error: fallback.error || "",
+        records: fallback.records,
+        upcomingMeets: fallback.upcomingMeets,
+        upcomingMeetsStatus: fallback.upcomingMeetsStatus,
+        members: members.map(normalizeMember),
+        sourceStatus: fallback.sourceStatus,
+        diagnostics: {
+          reason: "Official API returned no RS Kenneys records",
+          fallbackReason: fallback.fallbackReason,
+          fallbackSource: "tdsystem",
+          memberCount: members.length,
+          recordCount: fallback.records.length,
+          rankedRecordCount: 0,
+          failedRecordRequests: failedJobs,
+          upcomingMeetCount: fallback.upcomingMeets.length,
+          upcomingEntryCount: fallback.upcomingMeets.reduce((total, meet) => total + (meet.entries?.length || 0), 0),
+          failedUpcomingMeetRequests: upcomingMeetSyncFailed ? 1 : 0
+        },
+        checkedAt: new Date().toISOString()
+      });
+      return;
+    }
     const upcomingEntryCount = upcomingMeets.reduce((total, meet) => total + (meet.entries?.length || 0), 0);
     response.setHeader("Cache-Control", "no-store, max-age=0");
     response.status(200).json({
@@ -86,26 +114,59 @@ export default async function handler(request, response) {
     });
   } catch (error) {
     console.error("Official swim results sync failed", error);
+    const fallback = await fetchTdsystemFallback(request, error);
     response.setHeader("Cache-Control", "no-store, max-age=0");
     response.status(200).json({
-      error: "日本水泳連盟の選手記録を取得できませんでした。保存済みの記録を表示します。",
-      records: [],
-      upcomingMeets: [],
-      upcomingMeetsStatus: "error",
+      error: fallback.error || "日本水泳連盟の選手記録を取得できませんでした。TDsystemの記録を表示します。",
+      records: fallback.records,
+      upcomingMeets: fallback.upcomingMeets,
+      upcomingMeetsStatus: fallback.upcomingMeetsStatus,
       members: [],
-      sourceStatus: "error",
+      sourceStatus: fallback.sourceStatus,
       diagnostics: {
         reason: error.message,
+        fallbackReason: fallback.fallbackReason,
+        fallbackSource: "tdsystem",
         memberCount: 0,
-        recordCount: 0,
+        recordCount: fallback.records.length,
         rankedRecordCount: 0,
         failedRecordRequests: 0,
-        upcomingMeetCount: 0,
-        upcomingEntryCount: 0,
+        upcomingMeetCount: fallback.upcomingMeets.length,
+        upcomingEntryCount: fallback.upcomingMeets.reduce((total, meet) => total + (meet.entries?.length || 0), 0),
         failedUpcomingMeetRequests: 1
       },
       checkedAt: new Date().toISOString()
     });
+  }
+}
+
+async function fetchTdsystemFallback(request, originalError) {
+  try {
+    const months = clampNumber(request.query?.months, 12, 1, 24);
+    const result = await scrapeTdsystemRecords({
+      team: TEAM_NAME,
+      source: "https://www.tdsystem.co.jp/",
+      limitMeets: 240,
+      months,
+      futureMonths: 6
+    });
+    return {
+      records: Array.isArray(result.records) ? result.records : [],
+      upcomingMeets: Array.isArray(result.upcomingMeets) ? result.upcomingMeets : [],
+      upcomingMeetsStatus: "ok",
+      sourceStatus: "fallback",
+      fallbackReason: ""
+    };
+  } catch (fallbackError) {
+    console.error("TDsystem fallback sync failed", fallbackError);
+    return {
+      error: "記録の取得に失敗しました。保存済みの記録を表示します。",
+      records: [],
+      upcomingMeets: [],
+      upcomingMeetsStatus: "error",
+      sourceStatus: "error",
+      fallbackReason: fallbackError.message || originalError.message
+    };
   }
 }
 

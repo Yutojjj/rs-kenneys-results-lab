@@ -1128,7 +1128,9 @@ function MeetsView({ records, allRecords, upcomingMeets, archivedMembers, member
               </div>
               <span>
                 {meet.status === "upcoming"
-                  ? `${new Set(meet.entries.map((entry) => normalizeMemberName(entry.swimmer))).size}名 / ${new Set(meet.entries.map((entry) => upcomingEventSectionName(entry.event))).size}種目`
+                  ? meet.entries.length
+                    ? `${new Set(meet.entries.map((entry) => normalizeMemberName(entry.swimmer))).size}名 / ${new Set(meet.entries.map((entry) => upcomingEventSectionName(entry.event))).size}種目`
+                    : "出場予定"
                   : `${meet.records.length}件`}
               </span>
             </button>
@@ -1515,7 +1517,12 @@ function UpcomingMeetModal({ meet, records, archivedMembers, memberPhotos, membe
             </section>
           ))}
         </section>
-        {!filtered.length ? <EmptyState title="該当する出場予定がありません" text="絞り込み条件を変更してください。" /> : null}
+        {!filtered.length ? (
+          <EmptyState
+            title={meet.entries.length ? "該当する出場予定がありません" : "出場者詳細は未取得です"}
+            text={meet.entries.length ? "絞り込み条件を変更してください。" : "大会情報だけ取得できています。出場者が取得できるとここに表示されます。"}
+          />
+        ) : null}
       </section>
     </div>
       {selectedMember ? (
@@ -1928,7 +1935,7 @@ function buildUpcomingMeetCards(meets, query = "") {
       records: [],
       entries: Array.isArray(meet.entries) ? meet.entries : []
     }))
-    .filter((meet) => meet.entries.length > 0 && (meet.endDate || meet.date || "") >= todayText)
+    .filter((meet) => (meet.endDate || meet.date || "") >= todayText)
     .filter((meet) => {
       if (!needle) return true;
       return normalizeSearchText([meet.date, meet.name, meet.place, ...meet.entries.flatMap((entry) => [entry.swimmer, entry.reading, entry.event])].filter(Boolean).join(" ")).includes(needle);
