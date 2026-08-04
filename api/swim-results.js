@@ -86,10 +86,25 @@ export default async function handler(request, response) {
     });
   } catch (error) {
     console.error("Official swim results sync failed", error);
-    response.status(502).json({
-      error: "日本水泳連盟の選手記録を取得できませんでした。時間をおいて再度更新してください。",
+    response.setHeader("Cache-Control", "no-store, max-age=0");
+    response.status(200).json({
+      error: "日本水泳連盟の選手記録を取得できませんでした。保存済みの記録を表示します。",
       records: [],
-      upcomingMeets: []
+      upcomingMeets: [],
+      upcomingMeetsStatus: "error",
+      members: [],
+      sourceStatus: "error",
+      diagnostics: {
+        reason: error.message,
+        memberCount: 0,
+        recordCount: 0,
+        rankedRecordCount: 0,
+        failedRecordRequests: 0,
+        upcomingMeetCount: 0,
+        upcomingEntryCount: 0,
+        failedUpcomingMeetRequests: 1
+      },
+      checkedAt: new Date().toISOString()
     });
   }
 }

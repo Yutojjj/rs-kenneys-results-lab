@@ -108,11 +108,10 @@ async function fetchViaProxy(settings) {
       "Cache-Control": "no-cache"
     }
   });
+  const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new Error("記録の取得に失敗しました。プロキシ/APIの状態を確認してください。");
+    throw new Error(payload.error || `記録の取得に失敗しました。APIが ${response.status} を返しました。`);
   }
-
-  const payload = await response.json();
   if (!Array.isArray(payload.records)) {
     throw new Error("取得データの形式が想定と違います。records 配列を返すようにしてください。");
   }
