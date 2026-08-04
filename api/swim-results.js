@@ -15,6 +15,8 @@ const OFFICIAL_API_HEADERS = {
   Referer: "https://result.swim.or.jp/player-search",
   Origin: "https://result.swim.or.jp"
 };
+const SYNC_CACHE_MS = 5 * 60 * 1000;
+const syncCache = new Map();
 
 export default async function handler(request, response) {
   if (request.method !== "GET") {
@@ -29,6 +31,13 @@ export default async function handler(request, response) {
     }
 
     const months = clampNumber(request.query?.months, 12, 1, 24);
+    const cacheKey = JSON.stringify({ team: TEAM_NAME, months });
+    const cached = syncCache.get(cacheKey);
+    if (cached && Date.now() - cached.savedAt < SYNC_CACHE_MS) {
+      response.setHeader("Cache-Control", "no-store, max-age=0");
+      response.status(200).json({ ...cached.payload, cached: true, checkedAt: new Date().toISOString() });
+      return;
+    }
     const cutoff = createCutoffDate(months);
     const rosterPayload = await fetchOfficialJson("/athletes", {
       entry_group_name: TEAM_SEARCH_TERM,
@@ -75,13 +84,17 @@ export default async function handler(request, response) {
     let upcomingMeets = await upcomingMeetsPromise;
     let upcomingFallback = null;
     if (!upcomingMeets.length) {
-      upcomingFallback = await fetchTdsystemFallback(request, new Error("Official API returned no upcoming RS Kenneys meets"));
+      upcomingFallback = await fetchTdsystemFallback(request, new Error("Official API returned no upcoming RS Kenneys meets"), {
+        limitMeets: 80,
+        months: 1,
+        futureMonths: 2
+      });
       if (upcomingFallback.upcomingMeets.length) upcomingMeets = upcomingFallback.upcomingMeets;
     }
     if (!records.length && !upcomingMeets.length) {
       const fallback = await fetchTdsystemFallback(request, new Error("Official API returned no RS Kenneys records"));
       response.setHeader("Cache-Control", "no-store, max-age=0");
-      response.status(200).json({
+      const payload = {
         error: fallback.error || "",
         records: fallback.records,
         upcomingMeets: fallback.upcomingMeets,
@@ -101,12 +114,13 @@ export default async function handler(request, response) {
           failedUpcomingMeetRequests: upcomingMeetSyncFailed ? 1 : 0
         },
         checkedAt: new Date().toISOString()
-      });
+      };
+      syncCache.set(cacheKey, { savedAt: Date.now(), payload });
+      response.status(200).json(payload);
       return;
     }
     const upcomingEntryCount = upcomingMeets.reduce((total, meet) => total + (meet.entries?.length || 0), 0);
-    response.setHeader("Cache-Control", "no-store, max-age=0");
-    response.status(200).json({
+    const payload = {
       records,
       upcomingMeets,
       upcomingMeetsStatus: upcomingMeetSyncFailed ? "error" : "ok",
@@ -123,12 +137,15 @@ export default async function handler(request, response) {
         failedUpcomingMeetRequests: upcomingMeetSyncFailed ? 1 : 0
       },
       checkedAt: new Date().toISOString()
-    });
+    };
+    syncCache.set(cacheKey, { savedAt: Date.now(), payload });
+    response.setHeader("Cache-Control", "no-store, max-age=0");
+    response.status(200).json(payload);
   } catch (error) {
     console.error("Official swim results sync failed", error);
     const fallback = await fetchTdsystemFallback(request, error);
     response.setHeader("Cache-Control", "no-store, max-age=0");
-    response.status(200).json({
+    const fallbackPayload = {
       error: fallback.error || "日本水泳連盟の選手記録を取得できませんでした。TDsystemの記録を表示します。",
       records: fallback.records,
       upcomingMeets: fallback.upcomingMeets,
@@ -148,19 +165,24 @@ export default async function handler(request, response) {
         failedUpcomingMeetRequests: 1
       },
       checkedAt: new Date().toISOString()
-    });
+    };
+    if (fallback.records.length || fallback.upcomingMeets.length) {
+      const months = clampNumber(request.query?.months, 12, 1, 24);
+      syncCache.set(JSON.stringify({ team: TEAM_NAME, months }), { savedAt: Date.now(), payload: fallbackPayload });
+    }
+    response.status(200).json(fallbackPayload);
   }
 }
 
-async function fetchTdsystemFallback(request, originalError) {
+async function fetchTdsystemFallback(request, originalError, options = {}) {
   try {
-    const months = clampNumber(request.query?.months, 12, 1, 24);
+    const months = options.months || clampNumber(request.query?.months, 12, 1, 24);
     const result = await scrapeTdsystemRecords({
       team: TEAM_NAME,
       source: "https://www.tdsystem.co.jp/",
-      limitMeets: 240,
+      limitMeets: options.limitMeets || 240,
       months,
-      futureMonths: 6
+      futureMonths: options.futureMonths ?? 6
     });
     return {
       records: Array.isArray(result.records) ? result.records : [],

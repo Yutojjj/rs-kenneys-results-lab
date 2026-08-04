@@ -19,6 +19,8 @@ import { getStoredState, saveStoredState, syncRecordRanks, syncRecords } from ".
 import { bestQualification, evaluateRecordQualification, loadQualificationStandards, qualificationEvent } from "./qualification";
 
 const CARD_CROP_ASPECT = 1;
+const AUTO_SYNC_MINUTES = 15;
+const RESUME_SYNC_MINUTES = 5;
 const NAME_READING_PARTS = [
   ["森川", "もりかわ"],
   ["結芽", "ゆめ"]
@@ -36,6 +38,7 @@ function App() {
   const searchScrollTimersRef = useRef([]);
   const stateRef = useRef(state);
   const syncInFlightRef = useRef(null);
+  const lastAutoSyncAtRef = useRef(0);
 
   function resetSearchScroll() {
     window.scrollTo({ top: 0, left: 0, behavior: "auto" });
@@ -57,6 +60,7 @@ function App() {
 
   async function handleSync({ silent = false } = {}) {
     if (syncInFlightRef.current) return syncInFlightRef.current;
+    lastAutoSyncAtRef.current = Date.now();
     setError("");
     setIsSyncing(true);
     const syncTask = (async () => {
@@ -65,6 +69,7 @@ function App() {
         stateRef.current = nextState;
         setState(nextState);
         await persistState(nextState);
+        setIsSyncing(false);
         nextState = await syncRecordRanks(nextState, async (rankedState) => {
           stateRef.current = rankedState;
           setState(rankedState);
@@ -158,12 +163,21 @@ function App() {
       .finally(() => {
         if (!cancelled) handleSync({ silent: true });
       });
-    const refreshMinutes = stateRef.current.settings.refreshMinutes || 360;
+    const refreshMinutes = Math.min(stateRef.current.settings.refreshMinutes || AUTO_SYNC_MINUTES, AUTO_SYNC_MINUTES);
     const interval = window.setInterval(() => handleSync({ silent: true }), refreshMinutes * 60 * 1000);
+    function syncOnResume() {
+      if (document.visibilityState === "hidden") return;
+      if (Date.now() - lastAutoSyncAtRef.current < RESUME_SYNC_MINUTES * 60 * 1000) return;
+      handleSync({ silent: true });
+    }
+    window.addEventListener("focus", syncOnResume);
+    document.addEventListener("visibilitychange", syncOnResume);
     return () => {
       cancelled = true;
       unsubscribe();
       window.clearInterval(interval);
+      window.removeEventListener("focus", syncOnResume);
+      document.removeEventListener("visibilitychange", syncOnResume);
     };
   }, []);
 

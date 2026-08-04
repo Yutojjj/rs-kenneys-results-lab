@@ -1,4 +1,5 @@
 const STORAGE_KEY = "rs-kenneys-results-lab-state";
+const MAX_RANK_DETAILS_PER_SYNC = 24;
 
 const demoRecentResults = [
   {
@@ -36,7 +37,7 @@ const demoRecentResults = [
 const defaultState = {
   settings: {
     teamName: "RSケーニーズ",
-    refreshMinutes: 360,
+    refreshMinutes: 15,
     sourceUrl: "https://result.swim.or.jp/player-search",
     proxyUrl: import.meta.env.VITE_SWIM_RESULTS_PROXY_URL || "/api/swim-results",
     syncMonths: 12
@@ -123,8 +124,10 @@ export async function syncRecordRanks(previousState, onProgress) {
   let nextState = previousState;
   const resultIds = Array.from(new Set((previousState.recentResults || [])
     .filter((record) => !record.rank)
+    .sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")))
     .map(recordResultId)
-    .filter(Boolean)));
+    .filter(Boolean)))
+    .slice(0, MAX_RANK_DETAILS_PER_SYNC);
   const batches = [];
   for (let index = 0; index < resultIds.length; index += 12) {
     batches.push(resultIds.slice(index, index + 12));
