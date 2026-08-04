@@ -132,23 +132,6 @@ h1 {
   opacity: 0.72;
 }
 
-.dockSyncButton {
-  width: 42px;
-  min-width: 42px;
-  min-height: 42px;
-  padding: 0;
-}
-
-.spin {
-  animation: spin 0.9s linear infinite;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
 .searchBox svg,
 .settingsButton svg {
   color: #0f766e;
@@ -191,7 +174,7 @@ h1 {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 6px;
+  gap: 0;
   margin: 0;
   padding: 4px;
   border: 1px solid rgba(207, 226, 223, 0.92);

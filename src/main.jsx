@@ -6,7 +6,6 @@ import {
   Camera,
   CalendarDays,
   ImagePlus,
-  RefreshCw,
   Search,
   SlidersHorizontal,
   Trophy,
@@ -30,7 +29,6 @@ function App() {
   const [state, setState] = useState(() => getStoredState());
   const [query, setQuery] = useState("");
   const [error, setError] = useState("");
-  const [isSyncing, setIsSyncing] = useState(false);
   const [isDockHidden, setIsDockHidden] = useState(false);
   const [keyboardOffset, setKeyboardOffset] = useState(0);
   const queryReadyRef = useRef(false);
@@ -62,14 +60,12 @@ function App() {
     if (syncInFlightRef.current) return syncInFlightRef.current;
     lastAutoSyncAtRef.current = Date.now();
     setError("");
-    setIsSyncing(true);
     const syncTask = (async () => {
       try {
         let nextState = await syncRecords(stateRef.current);
         stateRef.current = nextState;
         setState(nextState);
         await persistState(nextState);
-        setIsSyncing(false);
         nextState = await syncRecordRanks(nextState, async (rankedState) => {
           stateRef.current = rankedState;
           setState(rankedState);
@@ -79,7 +75,6 @@ function App() {
         if (!silent || stateRef.current.recentResults.length === 0) setError(syncError.message);
       } finally {
         syncInFlightRef.current = null;
-        setIsSyncing(false);
       }
     })();
     syncInFlightRef.current = syncTask;
@@ -290,16 +285,6 @@ function App() {
             placeholder="選手名・大会名で検索"
           />
         </label>
-        <button
-          type="button"
-          className="syncButton dockSyncButton"
-          onClick={() => handleSync({ silent: false })}
-          disabled={isSyncing}
-          aria-label="更新"
-          title="更新"
-        >
-          <RefreshCw size={18} className={isSyncing ? "spin" : ""} />
-        </button>
       </div>
 
       <div className="pageSurface">
