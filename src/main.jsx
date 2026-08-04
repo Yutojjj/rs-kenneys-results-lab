@@ -1127,10 +1127,10 @@ function MeetsView({ records, allRecords, upcomingMeets, archivedMembers, member
                 <p>{meet.place}</p>
               </div>
               <span>
-                {meet.status === "upcoming"
+                {meet.status === "upcoming" || meet.status === "recent"
                   ? meet.entries.length
                     ? `${new Set(meet.entries.map((entry) => normalizeMemberName(entry.swimmer))).size}名 / ${new Set(meet.entries.map((entry) => upcomingEventSectionName(entry.event))).size}種目`
-                    : "出場予定"
+                    : meet.status === "recent" ? "直近大会" : "出場予定"
                   : `${meet.records.length}件`}
               </span>
             </button>
@@ -1217,7 +1217,7 @@ function MeetsView({ records, allRecords, upcomingMeets, archivedMembers, member
 }
 
 function MeetModal({ meet, records, allRecords, archivedMembers, memberPhotos, memberBirthdates, memberReadings, onArchiveToggle, onPhotoUpdate, onReadingUpdate, onBirthdateUpdate, onClose }) {
-  if (meet.status === "upcoming") {
+  if (meet.status === "upcoming" || meet.status === "recent") {
     return (
       <UpcomingMeetModal
         meet={meet}
@@ -1470,7 +1470,7 @@ function UpcomingMeetModal({ meet, records, archivedMembers, memberPhotos, membe
       <section className="settingsModal meetModal upcomingMeetModal" role="dialog" aria-modal="true" aria-label={`${meet.name}の出場予定`} onMouseDown={(event) => event.stopPropagation()}>
         <header className="modalHeader meetModalHeader">
           <div>
-            <p className="eyebrow">出場予定</p>
+            <p className="eyebrow">{meet.status === "recent" ? "直近大会" : "出場予定"}</p>
             <h2>{meet.name}</h2>
             <span>{formatMeetDateRange(meet)} / {meet.place}</span>
           </div>
@@ -1935,7 +1935,7 @@ function buildUpcomingMeetCards(meets, query = "") {
       records: [],
       entries: Array.isArray(meet.entries) ? meet.entries : []
     }))
-    .filter((meet) => (meet.endDate || meet.date || "") >= todayText)
+    .filter((meet) => meet.status === "recent" || (meet.endDate || meet.date || "") >= todayText)
     .filter((meet) => {
       if (!needle) return true;
       return normalizeSearchText([meet.date, meet.name, meet.place, ...meet.entries.flatMap((entry) => [entry.swimmer, entry.reading, entry.event])].filter(Boolean).join(" ")).includes(needle);

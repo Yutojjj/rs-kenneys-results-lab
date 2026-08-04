@@ -6,6 +6,7 @@ const TEAM_ALIASES = ["RSケーニーズ", "ＲＳケーニーズ", "RSｹｰﾆ
 const MAX_MEETS = 90;
 const REQUEST_DELAY_MS = 0;
 const MEET_CONCURRENCY = 8;
+const RECENT_MEET_DAYS = 14;
 
 export async function scrapeTdsystemRecords({ team = DEFAULT_TEAM, source = BASE_URL, limitMeets = MAX_MEETS, months = 12, futureMonths = 6 } = {}) {
   const meetLinks = await collectMeetLinks({ source, months, futureMonths, limitMeets });
@@ -21,7 +22,7 @@ export async function scrapeTdsystemRecords({ team = DEFAULT_TEAM, source = BASE
     const teamProgram = parseTeamProgram(teamListHtml, team);
     scannedMeets.push({ title: meet.name, url: meetLink.href, teamFound: Boolean(teamProgram) });
 
-    if (isUpcomingMeet(meet, today)) {
+    if (isUpcomingMeet(meet, today) || isRecentMeet(meet, today)) {
       if (!teamProgram) return;
       upcomingMeets.push({
         id: stableId([meet.date, meet.name, meet.url]),
@@ -32,7 +33,7 @@ export async function scrapeTdsystemRecords({ team = DEFAULT_TEAM, source = BASE
         sourceUrl: meet.url,
         entries: [],
         teamFound: Boolean(teamProgram),
-        status: "upcoming"
+        status: isUpcomingMeet(meet, today) ? "upcoming" : "recent"
       });
       return;
     }
@@ -288,6 +289,18 @@ function parseMonthRowDate(value, year, month) {
 function isUpcomingMeet(meet, today) {
   const endDate = meet.endDate || meet.date;
   return Boolean(endDate && endDate >= today);
+}
+
+function isRecentMeet(meet, today) {
+  const endDate = meet.endDate || meet.date;
+  if (!endDate || endDate >= today) return false;
+  const elapsedDays = (dateFromText(today) - dateFromText(endDate)) / 86400000;
+  return elapsedDays >= 0 && elapsedDays <= RECENT_MEET_DAYS;
+}
+
+function dateFromText(value) {
+  const [year, month, day] = String(value || "").split("/").map(Number);
+  return new Date(year, month - 1, day);
 }
 
 function formatDateParts(year, month, day) {

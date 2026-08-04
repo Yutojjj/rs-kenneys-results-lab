@@ -214,8 +214,8 @@ function normalizeMeets(meets, teamName) {
       status: meet.status || "upcoming",
       entries: normalizeMeetEntries(meet.entries || meet.entrants || meet.members || [], teamName)
     }))
-    .filter((meet) => meet.entries.length > 0 || meet.status === "upcoming")
-    .filter((meet) => meet.date && (meet.endDate || meet.date) >= today)
+    .filter((meet) => meet.entries.length > 0 || meet.status === "upcoming" || meet.status === "recent")
+    .filter((meet) => meet.date && (meet.status === "recent" || (meet.endDate || meet.date) >= today))
     .sort((a, b) => a.date.localeCompare(b.date));
 }
 
@@ -237,7 +237,7 @@ function normalizeMeetEntries(entries, teamName) {
 
 function keepFutureMeets(meets) {
   const today = formatDateForCompare(new Date());
-  return meets.filter((meet) => (meet.endDate || meet.date || "") >= today && Array.isArray(meet.entries));
+  return meets.filter((meet) => (meet.status === "recent" || (meet.endDate || meet.date || "") >= today) && Array.isArray(meet.entries));
 }
 
 function buildBestRecords(records) {

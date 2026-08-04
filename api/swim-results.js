@@ -9,6 +9,12 @@ const MEMBER_GROUP_CODE = 22;
 const PERIOD_CODE = 3;
 const ENTRY_COMPLETED_STATUS = 2;
 const UPCOMING_GAME_STATUSES = [1, ENTRY_COMPLETED_STATUS, 3];
+const OFFICIAL_API_HEADERS = {
+  Accept: "application/json, text/plain, */*",
+  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+  Referer: "https://result.swim.or.jp/player-search",
+  Origin: "https://result.swim.or.jp"
+};
 
 export default async function handler(request, response) {
   if (request.method !== "GET") {
@@ -66,7 +72,12 @@ export default async function handler(request, response) {
     });
 
     const records = dedupeRecords(resultGroups.flat()).sort((a, b) => b.date.localeCompare(a.date));
-    const upcomingMeets = await upcomingMeetsPromise;
+    let upcomingMeets = await upcomingMeetsPromise;
+    let upcomingFallback = null;
+    if (!upcomingMeets.length) {
+      upcomingFallback = await fetchTdsystemFallback(request, new Error("Official API returned no upcoming RS Kenneys meets"));
+      if (upcomingFallback.upcomingMeets.length) upcomingMeets = upcomingFallback.upcomingMeets;
+    }
     if (!records.length && !upcomingMeets.length) {
       const fallback = await fetchTdsystemFallback(request, new Error("Official API returned no RS Kenneys records"));
       response.setHeader("Cache-Control", "no-store, max-age=0");
@@ -100,8 +111,9 @@ export default async function handler(request, response) {
       upcomingMeets,
       upcomingMeetsStatus: upcomingMeetSyncFailed ? "error" : "ok",
       members: members.map(normalizeMember),
-      sourceStatus: failedJobs || upcomingMeetSyncFailed ? "partial" : "ok",
+      sourceStatus: upcomingFallback?.upcomingMeets.length ? "partial" : failedJobs || upcomingMeetSyncFailed ? "partial" : "ok",
       diagnostics: {
+        fallbackSource: upcomingFallback?.upcomingMeets.length ? "tdsystem-upcoming" : "",
         memberCount: members.length,
         recordCount: records.length,
         rankedRecordCount: records.filter((record) => Boolean(record.rank)).length,
@@ -244,6 +256,7 @@ async function fetchUpcomingMeets() {
 async function fetchTeamEntryDetail(gameCode, groupsPayload) {
   const groups = firstArray(groupsPayload, ["result", "data", "results"]);
   const team = groups.find((group) => String(group?.entry_group_code || group?.code || group?.entry_group?.code || "") === TEAM_CODE);
+  if (!team) return null;
   const candidateNames = Array.from(new Set([
     team?.entry_group_name,
     team?.name,
@@ -473,10 +486,7 @@ async function fetchOfficialJson(path, params = {}, attempt = 0) {
   try {
     const upstream = await fetch(url, {
       signal: controller.signal,
-      headers: {
-        Accept: "application/json",
-        "User-Agent": "RS-Kenneys-Results-Lab/1.0"
-      }
+      headers: OFFICIAL_API_HEADERS
     });
     if (!upstream.ok) {
       if (attempt < 1 && (upstream.status === 429 || upstream.status >= 500)) {
