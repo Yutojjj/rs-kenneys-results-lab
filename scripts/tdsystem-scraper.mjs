@@ -8,7 +8,13 @@ const REQUEST_DELAY_MS = 0;
 const MEET_CONCURRENCY = 8;
 const TRACKED_UPCOMING_MEET_PATTERNS = [
   /三河.*高(?:校|等学校)/,
-  /高(?:校|等学校).*三河/
+  /高(?:校|等学校).*三河/,
+  /岐阜県.*(?:小学生|中学生|高校生|学年別|市民|県民|社会人)/,
+  /コパンカップ/,
+  /JSCA/,
+  /滋賀.*(?:SC|クラブ対抗)/,
+  /AQUATICS\s*JAPANCUP/i,
+  /マスターズ/
 ];
 
 export async function scrapeTdsystemRecords({ team = DEFAULT_TEAM, source = BASE_URL, limitMeets = MAX_MEETS, months = 12, futureMonths = 6, memberNames = [] } = {}) {
@@ -156,9 +162,10 @@ function parseMeetLinksFromMonth(html, pageUrl) {
 
   return rows
     .map((row) => {
-      const gameId = /name=['"]G['"]\s+value=?"?(\d+)"?/i.exec(row)?.[1];
+      const gameId = /name=['"]G['"]\s+value=['"]?(\d+)/i.exec(row)?.[1] || /[?&]G=(\d+)/i.exec(row)?.[1];
       if (!gameId) return null;
       const cells = extractCells(row);
+      if (cells[0] === "日付" || cells[1] === "大会名") return null;
       const dateRange = parseMonthRowDate(cells[0], year, month);
       const label = cells[1] || `大会 ${gameId}`;
       const place = cells[2] || "";

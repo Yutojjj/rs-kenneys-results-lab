@@ -13,7 +13,13 @@ const ENTRY_COMPLETED_STATUS = 2;
 const UPCOMING_GAME_STATUSES = [1];
 const TRACKED_UPCOMING_MEET_PATTERNS = [
   /三河.*高(?:校|等学校)/,
-  /高(?:校|等学校).*三河/
+  /高(?:校|等学校).*三河/,
+  /岐阜県.*(?:小学生|中学生|高校生|学年別|市民|県民|社会人)/,
+  /コパンカップ/,
+  /JSCA/,
+  /滋賀.*(?:SC|クラブ対抗)/,
+  /AQUATICS\s*JAPANCUP/i,
+  /マスターズ/
 ];
 const OFFICIAL_API_HEADERS = {
   Accept: "application/json, text/plain, */*",
