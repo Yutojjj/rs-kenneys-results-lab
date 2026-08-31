@@ -58,7 +58,6 @@ function App() {
 
   async function handleSync({ silent = false } = {}) {
     if (syncInFlightRef.current) return syncInFlightRef.current;
-    lastAutoSyncAtRef.current = Date.now();
     setError("");
     const syncTask = (async () => {
       try {
@@ -66,6 +65,7 @@ function App() {
         stateRef.current = nextState;
         setState(nextState);
         await persistState(nextState);
+        lastAutoSyncAtRef.current = Date.now();
         nextState = await syncRecordRanks(nextState, async (rankedState) => {
           stateRef.current = rankedState;
           setState(rankedState);
@@ -140,11 +140,20 @@ function App() {
     function applyCloudState(cloudState) {
       if (cancelled || !cloudState) return;
       const currentState = stateRef.current;
+      const cloudSyncedAt = Date.parse(cloudState.lastSyncedAt || "") || 0;
+      const currentSyncedAt = Date.parse(currentState.lastSyncedAt || "") || 0;
+      const useCloudSyncData = !currentSyncedAt || cloudSyncedAt >= currentSyncedAt;
       const mergedState = {
         ...currentState,
         ...cloudState,
         settings: { ...currentState.settings, ...(cloudState.settings || {}) },
-        upcomingMeets: cloudState.upcomingMeets || currentState.upcomingMeets || []
+        recentResults: useCloudSyncData ? (cloudState.recentResults || currentState.recentResults || []) : currentState.recentResults,
+        bestRecords: useCloudSyncData ? (cloudState.bestRecords || currentState.bestRecords || []) : currentState.bestRecords,
+        upcomingMeets: useCloudSyncData
+          ? (Array.isArray(cloudState.upcomingMeets) ? cloudState.upcomingMeets : (currentState.upcomingMeets || []))
+          : (currentState.upcomingMeets || []),
+        updateHistory: useCloudSyncData ? (cloudState.updateHistory || currentState.updateHistory || []) : currentState.updateHistory,
+        lastSyncedAt: useCloudSyncData ? (cloudState.lastSyncedAt || currentState.lastSyncedAt) : currentState.lastSyncedAt
       };
       stateRef.current = mergedState;
       setState(mergedState);

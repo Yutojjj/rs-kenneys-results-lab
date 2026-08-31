@@ -50,6 +50,7 @@ export default async function handler(request, response) {
       response.status(200).json({ ...cached.payload, cached: true, checkedAt: new Date().toISOString() });
       return;
     }
+
     const cutoff = createCutoffDate(months);
     const rosterPayload = await fetchOfficialJson("/athletes", {
       entry_group_name: TEAM_SEARCH_TERM,
